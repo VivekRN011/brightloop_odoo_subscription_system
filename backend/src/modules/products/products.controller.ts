@@ -1,12 +1,26 @@
 import { Request, Response } from "express";
 import { ProductsService } from "./products.service";
 import { sendSuccess, sendError } from "../../utils/api-response";
+import { UserRole } from "@prisma/client";
+
+function sanitizeProduct(product: any, isStaffOrAdmin: boolean) {
+  if (isStaffOrAdmin) return product;
+  const { costPrice, notes, ...safe } = product;
+  return safe;
+}
 
 export class ProductsController {
   static async list(req: Request, res: Response) {
     try {
-      const data = await ProductsService.listProducts(req.query as any);
-      return sendSuccess(res, data);
+      const isStaffOrAdmin = req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.STAFF;
+      // If customer/public, only show active products
+      const query = {
+        ...(req.query as any),
+        ...(!isStaffOrAdmin && { isActive: "true" }),
+      };
+      const data = await ProductsService.listProducts(query);
+      const sanitizedItems = data.items.map((p) => sanitizeProduct(p, isStaffOrAdmin));
+      return sendSuccess(res, { ...data, items: sanitizedItems });
     } catch (error: any) {
       return sendError(res, error.message || "Failed to fetch products", 400);
     }
@@ -14,8 +28,12 @@ export class ProductsController {
 
   static async getById(req: Request, res: Response) {
     try {
+      const isStaffOrAdmin = req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.STAFF;
       const data = await ProductsService.getProductById(req.params.id as string);
-      return sendSuccess(res, data);
+      if (!isStaffOrAdmin && !data.isActive) {
+        return sendError(res, "Product not found or unavailable", 404);
+      }
+      return sendSuccess(res, sanitizeProduct(data, isStaffOrAdmin));
     } catch (error: any) {
       return sendError(res, error.message || "Failed to fetch product", 404);
     }

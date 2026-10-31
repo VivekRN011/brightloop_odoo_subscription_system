@@ -2,6 +2,8 @@ import { AdminSubscriptionsPage } from '@/features/subscriptions/pages/AdminSubs
 import { AdminInvoicesPage } from '@/features/invoices/pages/AdminInvoicesPage';
 import { AdminCustomersPage } from '@/features/customers/pages/AdminCustomersPage';
 import { AdminPaymentsPage } from '@/features/payments/pages/AdminPaymentsPage';
+import { AdminProductsPage } from '@/features/products/pages/AdminProductsPage';
+import { AdminPlansPage } from '@/features/plans/pages/AdminPlansPage';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -119,35 +121,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'products',
-        element: (
-          <PlaceholderPage
-            title="Products & Variants"
-            description="Configure subscription products, cost prices, sales prices, and product variants."
-            category="Catalog"
-            plannedFeatures={[
-              'Product catalog management storing name, type, sales price, cost price, and notes (PRD FR-PROD-02)',
-              'Product variant attributes (e.g. Brand, Tier) with price adjustments (FR-PROD-03/05)',
-              'Product activation and deactivation toggles',
-              'Historical invoice pricing immutability (FR-PROD-07)',
-            ]}
-          />
-        ),
+        element: <AdminProductsPage />,
       },
       {
         path: 'plans',
-        element: (
-          <PlaceholderPage
-            title="Subscription Plans"
-            description="Define recurring pricing tiers, billing cadences, and subscription lifecycle rules."
-            category="Catalog"
-            plannedFeatures={[
-              'Strict support for 4 billing intervals: Daily, Weekly, Monthly, and Yearly (PRD FR-PLAN-03)',
-              'Minimum subscription quantity and plan availability start/end dates (FR-PLAN-04/05)',
-              'Automatic closure at end of plan configuration (FR-PLAN-06)',
-              'Early closure, pause, and renewal permission flags (FR-PLAN-07/08/09)',
-            ]}
-          />
-        ),
+        element: <AdminPlansPage />,
       },
       {
         path: 'quotation-templates',
