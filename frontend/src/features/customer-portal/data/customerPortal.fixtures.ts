@@ -1,28 +1,51 @@
-import type { CustomerSummary } from '../models/customerPortal.types';
+import type { CustomerSummary, CustomerPayment } from '../models/customerPortal.types';
+
+export const mockPayments: CustomerPayment[] = [
+  {
+    id: 'pay-001',
+    paymentNumber: 'PAY-2026-0812',
+    invoiceNumber: 'INV-2026-0744',
+    amount: 45000,
+    paymentDate: '2026-10-02',
+    paymentMethod: 'BANK_TRANSFER',
+    referenceNote: 'NEFT Transfer UTR HDFCN262761890',
+    status: 'COMPLETED',
+  },
+  {
+    id: 'pay-002',
+    paymentNumber: 'PAY-2026-0604',
+    invoiceNumber: 'INV-2026-0612',
+    amount: 45000,
+    paymentDate: '2026-09-01',
+    paymentMethod: 'UPI',
+    referenceNote: 'UPI Reference 324109827612@icici',
+    status: 'COMPLETED',
+  },
+];
 
 export const mockCustomerSummary: CustomerSummary = {
   profile: {
-    id: 'cust-apex-01',
-    name: 'Vikram Mehta',
-    email: 'billing@apexlogistics.in',
-    companyName: 'Apex Logistics India Pvt Ltd',
-    customerCode: 'CUST-APX-8921',
-    phone: '+91 98450 12345',
-    gstin: '32AABCA1234F1Z8',
-    pan: 'AABCA1234F',
+    id: 'cust-sarah-01',
+    name: 'Sarah Chen',
+    email: 'sarah.chen@acme.inc',
+    companyName: 'Acme Enterprises Inc.',
+    customerCode: 'CUST-0001',
+    phone: '+91 98765 43210',
+    gstin: '32ABCDE1234F1Z5',
+    pan: 'ABCDE1234F',
     city: 'Kochi',
     state: 'Kerala',
     billingAddress: {
-      street: '42 Marine Drive, Willingdon Island',
+      street: 'Tower B, Level 4, Infopark, Kakkanad',
       city: 'Kochi',
       state: 'Kerala',
-      pincode: '682003',
+      pincode: '682042',
       country: 'India',
     },
   },
   activeSubscriptionsCount: 2,
   nextRenewalDate: '2026-11-10',
-  nextRenewalPlan: 'Dedicated Storage Add-on (1TB)',
+  nextRenewalPlan: 'Advanced Analytics & Forecasting Add-on',
   totalOutstandingAmount: 3500,
   totalPaidAmount: 90000,
   paidInvoicesCount: 2,
@@ -30,8 +53,8 @@ export const mockCustomerSummary: CustomerSummary = {
     {
       id: 'sub-01',
       subscriptionNumber: 'SUB-2026-0891',
-      planName: 'Enterprise Cloud ERP Plan',
-      productName: 'Brightloop Enterprise Core',
+      planName: 'Enterprise Annual',
+      productName: 'Brightloop Core Billing Engine',
       status: 'active',
       quantity: 25,
       billingInterval: 'YEARLY',
@@ -44,12 +67,12 @@ export const mockCustomerSummary: CustomerSummary = {
     {
       id: 'sub-02',
       subscriptionNumber: 'SUB-2026-0088',
-      planName: 'Dedicated Cloud Storage (1TB)',
-      productName: 'Encrypted Cloud Storage',
+      planName: 'Business Pro - Monthly',
+      productName: 'Advanced Analytics & Forecasting Add-on',
       status: 'active',
       quantity: 1,
       billingInterval: 'MONTHLY',
-      price: 3500,
+      price: 4500,
       currency: 'INR',
       startDate: '2026-10-10',
       expiryDate: '2027-10-10',
@@ -68,6 +91,17 @@ export const mockCustomerSummary: CustomerSummary = {
       status: 'confirmed',
       isOverdue: false,
       planName: 'Dedicated Cloud Storage (1TB)',
+      lines: [
+        {
+          id: 'line-001',
+          description: 'Encrypted Cloud Storage License (1TB)',
+          quantity: 1,
+          unitPrice: 2966.10,
+          amount: 2966.10,
+          taxRate: 0.18,
+          taxAmount: 533.90,
+        },
+      ],
     },
     {
       id: 'inv-002',
@@ -80,6 +114,17 @@ export const mockCustomerSummary: CustomerSummary = {
       status: 'paid',
       isOverdue: false,
       planName: 'Enterprise Cloud ERP Plan',
+      lines: [
+        {
+          id: 'line-002',
+          description: 'Brightloop Enterprise Core - 25 User Licenses',
+          quantity: 25,
+          unitPrice: 1525.42,
+          amount: 38135.59,
+          taxRate: 0.18,
+          taxAmount: 6864.41,
+        },
+      ],
     },
     {
       id: 'inv-003',
@@ -92,6 +137,17 @@ export const mockCustomerSummary: CustomerSummary = {
       status: 'paid',
       isOverdue: false,
       planName: 'Enterprise Cloud ERP Plan',
+      lines: [
+        {
+          id: 'line-003',
+          description: 'Brightloop Enterprise Core - 25 User Licenses',
+          quantity: 25,
+          unitPrice: 1525.42,
+          amount: 38135.59,
+          taxRate: 0.18,
+          taxAmount: 6864.41,
+        },
+      ],
     },
   ],
   outstandingInvoices: [
@@ -108,28 +164,19 @@ export const mockCustomerSummary: CustomerSummary = {
       planName: 'Dedicated Cloud Storage (1TB)',
     },
   ],
+  payments: mockPayments,
 };
 
-/** Generates a fresh customer summary for a newly registered customer with 0 subscriptions */
-export function getEmptyCustomerSummary(name: string, email: string, companyName?: string): CustomerSummary {
+/** Generates an initialized customer summary customized to the signed-in user */
+export function getCustomerSummaryForUser(name: string, email: string, companyName?: string): CustomerSummary {
   return {
+    ...mockCustomerSummary,
     profile: {
-      id: `cust-${Date.now()}`,
-      name,
-      email,
-      companyName: companyName || 'New Subscriber Organization',
-      customerCode: `CUST-NEW-${Math.floor(1000 + Math.random() * 9000)}`,
-      city: 'Bangalore',
-      state: 'Karnataka',
+      ...mockCustomerSummary.profile,
+      name: name || 'Sarah Chen',
+      email: email || 'sarah.chen@acme.inc',
+      companyName: companyName || 'Acme Enterprises Inc.',
+      customerCode: 'CUST-0001',
     },
-    activeSubscriptionsCount: 0,
-    nextRenewalDate: null,
-    nextRenewalPlan: null,
-    totalOutstandingAmount: 0,
-    totalPaidAmount: 0,
-    paidInvoicesCount: 0,
-    subscriptions: [],
-    recentInvoices: [],
-    outstandingInvoices: [],
   };
 }
