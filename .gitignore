@@ -30,8 +30,19 @@ coverage/
 .DS_Store
 Thumbs.db
 
-
+# Docs
 conversation.md
-
 /docs
+design.md
+
+# Odoo
+*.pyc
+__pycache__/
+*.egg-info/
+.pytest_cache/
+
+# Tests
+.coverage
+htmlcov/
+test_*.py
 
