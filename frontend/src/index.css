@@ -54,6 +54,16 @@
 
   --color-card-pure: #ffffff;
 
+  /* Nextsub Design Reference Tokens */
+  --color-ns-bg: #EDEFF4;
+  --color-ns-text: #040404;
+  --color-ns-primary: #2346ED;
+  --color-ns-primary-hover: #1b37c7;
+  --color-ns-primary-subtle: #EEF2FF;
+  --color-ns-muted: #A9B6CF;
+  --color-ns-border: #E2E6EE;
+  --color-ns-subtext: #5A6578;
+
   --font-headline: 'Inter', system-ui, sans-serif;
   --font-body: 'Inter', system-ui, sans-serif;
   --font-label: 'Inter', system-ui, sans-serif;

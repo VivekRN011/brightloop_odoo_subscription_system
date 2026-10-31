@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import { staffService, StaffUser } from '../services/staff.service';
+import { staffService, type StaffUser } from '../services/staff.service';
 import { formatDate, formatRelativeTime } from '@/lib/format';
 
 const mockStaff: StaffUser[] = [

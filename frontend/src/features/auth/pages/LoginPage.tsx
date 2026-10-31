@@ -4,7 +4,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/context/AuthContext';
 import { loginSchema, type LoginFormData } from '../schemas/auth.schemas';
-import { DEMO_USERS } from '../services/auth.service';
 import { api } from '@/services/api';
 
 export const LoginPage: React.FC = () => {
@@ -70,15 +69,6 @@ export const LoginPage: React.FC = () => {
       } else {
         setFormError('An unexpected error occurred during login. Please try again.');
       }
-    }
-  };
-
-  const handleFillDemo = (type: 'admin' | 'staff' | 'customer') => {
-    const demo = DEMO_USERS[type];
-    if (demo) {
-      setValue('email', demo.email);
-      setValue('password', demo.passwordHint);
-      setFormError(null);
     }
   };
 
