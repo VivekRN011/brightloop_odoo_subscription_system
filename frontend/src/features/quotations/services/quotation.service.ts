@@ -143,6 +143,11 @@ export const quotationService = {
     }
   },
 
+  async createTemplate(data: any): Promise<any> {
+    const response = await api.post('/quotations/templates', data);
+    return response.data;
+  },
+
   async createQuotation(data: any): Promise<any> {
     const response = await api.post('/quotations', data);
     return response.data;
@@ -158,4 +163,3 @@ export const quotationService = {
     return response.data;
   },
 };
-
