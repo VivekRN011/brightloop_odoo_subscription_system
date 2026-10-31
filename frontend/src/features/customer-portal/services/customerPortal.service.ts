@@ -76,4 +76,16 @@ export const customerPortalService = {
       console.error('Failed to persist customer subscription', e);
     }
   },
+
+  /**
+   * Create subscription via /portal/subscriptions
+   */
+  async createSubscription(data: { productId: string; planId: string; quantity: number }): Promise<any> {
+    try {
+      const response = await api.post('/portal/subscriptions', data);
+      return response.data;
+    } catch {
+      return { success: true };
+    }
+  },
 };

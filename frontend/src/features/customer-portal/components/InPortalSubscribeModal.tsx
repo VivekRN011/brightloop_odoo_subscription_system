@@ -20,6 +20,7 @@ export interface InPortalSubscribeModalProps {
   onClose: () => void;
   initialProductId?: string;
   initialPlanCode?: string;
+  onSuccess?: () => void;
 }
 
 export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
@@ -27,6 +28,7 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
   onClose,
   initialProductId,
   initialPlanCode,
+  onSuccess,
 }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -126,6 +128,7 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
 
       await customerPortalService.addSubscription(user, newSub);
       queryClient.invalidateQueries({ queryKey: ['portal', 'summary'] });
+      onSuccess?.();
       setIsSubmitting(false);
       setCreatedSubscription(newSub);
       setStep(3); // Success step
