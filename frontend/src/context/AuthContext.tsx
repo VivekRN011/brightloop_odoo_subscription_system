@@ -57,11 +57,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
-  const switchDemoRole = (role: UserRole) => {
+  const switchDemoRole = async (role: UserRole) => {
     const key = role.toLowerCase() as keyof typeof DEMO_USERS;
     const demo = DEMO_USERS[key];
     if (demo) {
-      setUser(demo);
+      try {
+        const res = await authService.login({
+          email: demo.email,
+          password: demo.passwordHint || 'Brightloop@2026',
+          remember: true,
+        });
+        setUser(res.user);
+      } catch {
+        setUser(demo);
+      }
     }
   };
 

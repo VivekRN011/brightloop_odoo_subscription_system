@@ -106,29 +106,54 @@ export class SubscriptionsService {
   }
 
   static async getSubscriptionById(id: string) {
-    const subscription = await prisma.subscription.findUnique({
-      where: { id },
-      include: {
-        customer: true,
-        plan: true,
-        quotation: true,
-        createdBy: {
-          select: { id: true, email: true },
-        },
-        lines: {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id).trim());
+    const subscription = isUuid
+      ? await prisma.subscription.findUnique({
+          where: { id },
           include: {
-            product: true,
+            customer: true,
             plan: true,
+            quotation: true,
+            createdBy: {
+              select: { id: true, email: true },
+            },
+            lines: {
+              include: {
+                product: true,
+                plan: true,
+              },
+            },
+            invoices: {
+              orderBy: { issueDate: "desc" },
+              include: {
+                allocations: true,
+              },
+            },
           },
-        },
-        invoices: {
-          orderBy: { issueDate: "desc" },
+        })
+      : await prisma.subscription.findFirst({
+          where: { subscriptionNumber: id },
           include: {
-            allocations: true,
+            customer: true,
+            plan: true,
+            quotation: true,
+            createdBy: {
+              select: { id: true, email: true },
+            },
+            lines: {
+              include: {
+                product: true,
+                plan: true,
+              },
+            },
+            invoices: {
+              orderBy: { issueDate: "desc" },
+              include: {
+                allocations: true,
+              },
+            },
           },
-        },
-      },
-    });
+        });
 
     if (!subscription) {
       throw new Error("Subscription not found");

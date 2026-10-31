@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invoiceService } from '../services/invoice.service';
+import { api } from '@/services/api';
+import { formatINR } from '@/lib/format';
 import { toast } from 'sonner';
 
 interface InvoiceRow {
   id: string;
+  rawId: string;
   irn?: string;
   dunningBadge?: string;
   customer: string;
+  customerId?: string;
   gstin: string;
   subRef: string;
   invoiceDate: string;
@@ -15,12 +21,15 @@ interface InvoiceRow {
   taxable: string;
   gst: string;
   total: string;
+  totalRaw: number;
   outstanding: string;
+  outstandingRaw: number;
   status: 'PAID' | 'OVERDUE' | 'PENDING' | 'DRAFT';
 }
 
 export const AdminInvoicesPage: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const initialStatus = searchParams.get('status')?.toUpperCase() || 'ALL';
 
@@ -29,101 +38,57 @@ export const AdminInvoicesPage: React.FC = () => {
   );
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [period, setPeriod] = useState<string>('Q3 2026');
+  const [period, setPeriod] = useState<string>('Current Cycle');
 
   // Payment recording modal
   const [payModalInvoice, setPayModalInvoice] = useState<InvoiceRow | null>(null);
   const [payAmount, setPayAmount] = useState<string>('');
   const [payMethod, setPayMethod] = useState<string>('UPI');
+  const [isSubmittingPay, setIsSubmittingPay] = useState(false);
 
-  const [invoices, setInvoices] = useState<InvoiceRow[]>([
-    {
-      id: 'INV-2026-1048',
-      irn: 'IRN: e9f2a8...3b9',
-      customer: 'Nexarise Technologies Pvt Ltd',
-      gstin: 'GSTIN: 27AABCN1234F1Z8',
-      subRef: 'SUB-8941',
-      invoiceDate: 'Oct 14, 2026',
-      dueDate: 'Due Oct 28, 2026',
-      taxable: '₹2,40,000',
-      gst: '+₹43,200 GST',
-      total: '₹2,83,200',
-      outstanding: '₹0',
-      status: 'PAID',
-    },
-    {
-      id: 'INV-2026-1047',
-      dunningBadge: 'Dunning L2 (Grace Expiring)',
-      customer: 'Kore Technologies India',
-      gstin: 'GSTIN: 29AABCK5678M1ZT',
-      subRef: 'SUB-8940',
-      invoiceDate: 'Sep 24, 2026',
-      dueDate: 'Due Oct 08, 2026',
-      dueNote: '6d overdue',
-      taxable: '₹85,000',
-      gst: '+₹15,300 GST',
-      total: '₹1,00,300',
-      outstanding: '₹1,00,300',
-      status: 'OVERDUE',
-    },
-    {
-      id: 'INV-2026-1046',
-      irn: 'IRN: 3a7b11...90c',
-      customer: 'Almanac AI Systems',
-      gstin: 'GSTIN: 07AABCA9012K1Z4',
-      subRef: 'SUB-8939',
-      invoiceDate: 'Oct 12, 2026',
-      dueDate: 'Due Oct 26, 2026',
-      taxable: '₹45,000',
-      gst: '+₹8,100 GST',
-      total: '₹53,100',
-      outstanding: '₹53,100',
-      status: 'PENDING',
-    },
-    {
-      id: 'INV-2026-1045',
-      irn: 'IRN: 88c1df...44a',
-      customer: 'Zylos Health Tech',
-      gstin: 'GSTIN: 33AABCZ3456P1ZX',
-      subRef: 'SUB-8938',
-      invoiceDate: 'Oct 11, 2026',
-      dueDate: 'Due Oct 25, 2026',
-      taxable: '₹32,000',
-      gst: '+₹5,760 GST',
-      total: '₹37,760',
-      outstanding: '₹0',
-      status: 'PAID',
-    },
-    {
-      id: 'INV-2026-1044',
-      irn: 'IRN: d4f009...77e',
-      customer: 'Infiniti Logistics Pvt Ltd',
-      gstin: 'GSTIN: 27AABCI4412L1ZB',
-      subRef: 'SUB-8937',
-      invoiceDate: 'Oct 08, 2026',
-      dueDate: 'Due Oct 22, 2026',
-      taxable: '₹1,15,000',
-      gst: '+₹20,700 GST',
-      total: '₹1,35,700',
-      outstanding: '₹0',
-      status: 'PAID',
-    },
-    {
-      id: 'INV-2026-1043',
-      dunningBadge: 'Dunning L1 (Auto-retry Day 2)',
-      customer: 'UrbanCraft Retail Pvt Ltd',
-      gstin: 'GSTIN: 06AABCU8891J1ZP',
-      subRef: 'SUB-8936',
-      invoiceDate: 'Sep 29, 2026',
-      dueDate: 'Due Oct 13, 2026',
-      dueNote: '1d overdue',
-      taxable: '₹72,000',
-      gst: '+₹12,960 GST',
-      total: '₹84,960',
-      outstanding: '₹84,960',
-      status: 'OVERDUE',
-    },
-  ]);
+  // Fetch real invoices from database
+  const { data: rawInvoices = [] } = useQuery({
+    queryKey: ['admin', 'invoices'],
+    queryFn: () => invoiceService.getInvoices(),
+    staleTime: 30 * 1000,
+  });
+
+  const invoices: InvoiceRow[] = rawInvoices.map((inv) => {
+    let status: 'PAID' | 'OVERDUE' | 'PENDING' | 'DRAFT' = 'PENDING';
+    if (inv.status === 'PAID') {
+      status = 'PAID';
+    } else if (inv.status === 'DRAFT') {
+      status = 'DRAFT';
+    } else if (inv.isOverdue || (inv.status === 'CONFIRMED' && new Date(inv.dueDate) < new Date())) {
+      status = 'OVERDUE';
+    } else {
+      status = 'PENDING';
+    }
+
+    const taxableVal = Math.round((inv.totalAmount / 1.18) * 100) / 100;
+    const gstVal = Math.round((inv.totalAmount - taxableVal) * 100) / 100;
+
+    return {
+      id: inv.invoiceNumber || inv.id,
+      rawId: inv.id,
+      irn: `IRN: ${inv.id.slice(0, 8)}...${inv.id.slice(-4)}`,
+      dunningBadge: status === 'OVERDUE' ? 'Dunning Active' : undefined,
+      customer: inv.customerName,
+      customerId: (inv as any).customerId,
+      gstin: `CODE: ${inv.customerCode || 'CORPORATE'}`,
+      subRef: (inv as any).subscriptionNumber || 'SUB-RECURRING',
+      invoiceDate: inv.issueDate ? new Date(inv.issueDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent',
+      dueDate: inv.dueDate ? `Due ${new Date(inv.dueDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}` : 'On receipt',
+      dueNote: status === 'OVERDUE' ? 'Action required' : undefined,
+      taxable: formatINR(taxableVal),
+      gst: `+${formatINR(gstVal)} GST`,
+      total: formatINR(inv.totalAmount),
+      totalRaw: inv.totalAmount,
+      outstanding: formatINR(inv.outstandingBalance),
+      outstandingRaw: inv.outstandingBalance,
+      status,
+    };
+  });
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -139,25 +104,27 @@ export const AdminInvoicesPage: React.FC = () => {
     );
   };
 
-  const handleRecordPayment = (e: React.FormEvent) => {
+  const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!payModalInvoice) return;
 
-    setInvoices((prev) =>
-      prev.map((inv) => {
-        if (inv.id === payModalInvoice.id) {
-          return {
-            ...inv,
-            outstanding: '₹0',
-            status: 'PAID',
-            dunningBadge: undefined,
-          };
-        }
-        return inv;
-      })
-    );
-    toast.success(`Payment of ${payAmount} recorded for ${payModalInvoice.id} via ${payMethod}.`);
-    setPayModalInvoice(null);
+    setIsSubmittingPay(true);
+    try {
+      await api.post('/payments', {
+        invoiceId: payModalInvoice.rawId,
+        amount: Number(payAmount),
+        method: payMethod,
+        reference: `${payMethod}-MANUAL-${Date.now().toString().slice(-6)}`,
+      });
+      toast.success(`Payment of ₹${payAmount} successfully recorded for ${payModalInvoice.id}!`);
+      setPayModalInvoice(null);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to record payment');
+    } finally {
+      setIsSubmittingPay(false);
+    }
   };
 
   const filtered = invoices.filter((inv) => {
@@ -174,6 +141,18 @@ export const AdminInvoicesPage: React.FC = () => {
     if (activeTab === 'DRAFT') return inv.status === 'DRAFT';
     return true;
   });
+
+  // Calculate live financial totals
+  const totalInvoicedSum = invoices.reduce((sum, inv) => sum + inv.totalRaw, 0);
+  const totalPaidSum = invoices.reduce((sum, inv) => sum + (inv.totalRaw - inv.outstandingRaw), 0);
+  const totalOutstandingSum = invoices.reduce((sum, inv) => sum + inv.outstandingRaw, 0);
+  const overdueInvoices = invoices.filter((i) => i.status === 'OVERDUE');
+  const overdueTotalSum = overdueInvoices.reduce((sum, inv) => sum + inv.outstandingRaw, 0);
+
+  const paidCount = invoices.filter((i) => i.status === 'PAID').length;
+  const pendingCount = invoices.filter((i) => i.status === 'PENDING').length;
+  const overdueCount = overdueInvoices.length;
+  const draftCount = invoices.filter((i) => i.status === 'DRAFT').length;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 py-6 font-body text-on-surface">
@@ -221,7 +200,7 @@ export const AdminInvoicesPage: React.FC = () => {
         {/* Metric Card 1: Total Invoiced */}
         <div className="bg-surface-container-lowest rounded-xl p-4 border border-outline-variant shadow-sm hover:border-primary/40 transition-all flex flex-col justify-between">
           <div className="flex items-start justify-between">
-            <span className="text-xs font-semibold text-on-surface-variant">Total Invoiced (Q3)</span>
+            <span className="text-xs font-semibold text-on-surface-variant">Total Invoiced</span>
             <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-on-surface-variant">
               <span className="material-symbols-outlined text-base" data-icon="account_balance_wallet">
                 account_balance_wallet
@@ -229,12 +208,14 @@ export const AdminInvoicesPage: React.FC = () => {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold font-headline text-on-surface tracking-tight">₹1,18,40,000</div>
+            <div className="text-2xl font-bold font-headline text-on-surface tracking-tight">
+              {formatINR(totalInvoicedSum)}
+            </div>
             <div className="flex items-center gap-2 mt-1.5 text-xs">
               <span className="inline-flex items-center text-primary font-semibold text-[11px] bg-secondary-container px-1.5 py-0.5 rounded">
-                +14.2%
+                Live
               </span>
-              <span className="text-on-surface-variant">342 invoices vs Q2</span>
+              <span className="text-on-surface-variant">{invoices.length} invoices in database</span>
             </div>
           </div>
         </div>
@@ -250,11 +231,15 @@ export const AdminInvoicesPage: React.FC = () => {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold font-headline text-on-surface tracking-tight">₹1,12,55,000</div>
+            <div className="text-2xl font-bold font-headline text-on-surface tracking-tight">
+              {formatINR(totalPaidSum)}
+            </div>
             <div className="flex items-center gap-2 mt-1.5 text-xs">
-              <span className="text-xs font-semibold text-primary">95.1% collection</span>
+              <span className="text-xs font-semibold text-primary">
+                {totalInvoicedSum > 0 ? `${Math.round((totalPaidSum / totalInvoicedSum) * 100)}% settled` : '100% settled'}
+              </span>
               <span className="text-outline">·</span>
-              <span className="text-on-surface-variant truncate">via NACH / e-Mandate</span>
+              <span className="text-on-surface-variant truncate">via Razorpay &amp; Bank Allocations</span>
             </div>
           </div>
         </div>
@@ -270,11 +255,13 @@ export const AdminInvoicesPage: React.FC = () => {
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold font-headline text-on-surface tracking-tight">₹4,00,000</div>
+            <div className="text-2xl font-bold font-headline text-on-surface tracking-tight">
+              {formatINR(totalOutstandingSum)}
+            </div>
             <div className="flex items-center gap-2 mt-1.5 text-xs">
-              <span className="text-on-surface-variant font-medium">12 invoices</span>
+              <span className="text-on-surface-variant font-medium">{pendingCount} pending</span>
               <span className="text-outline">·</span>
-              <span className="text-outline">avg 3 days to due date</span>
+              <span className="text-outline">Awaiting reconciliation</span>
             </div>
           </div>
         </div>
@@ -284,16 +271,18 @@ export const AdminInvoicesPage: React.FC = () => {
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-semibold text-primary">Overdue / In Dunning</span>
-              <span className="w-2 h-2 rounded-full bg-error animate-pulse"></span>
+              {overdueCount > 0 && <span className="w-2 h-2 rounded-full bg-error animate-pulse"></span>}
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-wider bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded-full">
-              Attention
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${overdueCount > 0 ? 'bg-secondary-container text-on-secondary-container' : 'bg-emerald-50 text-emerald-800'}`}>
+              {overdueCount > 0 ? 'Attention' : 'Clear'}
             </span>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold font-headline text-primary tracking-tight">₹1,85,000</div>
+            <div className="text-2xl font-bold font-headline text-primary tracking-tight">
+              {formatINR(overdueTotalSum)}
+            </div>
             <div className="flex items-center justify-between mt-1.5 text-xs">
-              <span className="text-on-surface-variant font-medium">9 invoices requiring follow-up</span>
+              <span className="text-on-surface-variant font-medium">{overdueCount} overdue</span>
               <button
                 onClick={() => setActiveTab('OVERDUE')}
                 className="text-primary font-semibold hover:underline flex items-center gap-0.5 text-[11px]"
@@ -320,7 +309,7 @@ export const AdminInvoicesPage: React.FC = () => {
                 : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
             }`}
           >
-            All (342)
+            All ({invoices.length})
           </button>
           <button
             onClick={() => setActiveTab('PAID')}
@@ -330,7 +319,7 @@ export const AdminInvoicesPage: React.FC = () => {
                 : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
             }`}
           >
-            Paid (321)
+            Paid ({paidCount})
           </button>
           <button
             onClick={() => setActiveTab('PENDING')}
@@ -340,7 +329,7 @@ export const AdminInvoicesPage: React.FC = () => {
                 : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
             }`}
           >
-            Pending (12)
+            Pending ({pendingCount})
           </button>
           <button
             onClick={() => setActiveTab('OVERDUE')}
@@ -350,8 +339,8 @@ export const AdminInvoicesPage: React.FC = () => {
                 : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
             }`}
           >
-            <span>Overdue (9)</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-error"></span>
+            <span>Overdue ({overdueCount})</span>
+            {overdueCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-error"></span>}
           </button>
           <button
             onClick={() => setActiveTab('DRAFT')}
@@ -361,7 +350,7 @@ export const AdminInvoicesPage: React.FC = () => {
                 : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
             }`}
           >
-            Draft (0)
+            Draft ({draftCount})
           </button>
         </div>
 
@@ -570,7 +559,7 @@ export const AdminInvoicesPage: React.FC = () => {
           <div className="flex items-center gap-3 text-on-surface-variant">
             <span>
               Showing <span className="font-semibold text-on-surface">1 to {filtered.length}</span> of{' '}
-              <span className="font-semibold text-on-surface">342</span> invoices
+              <span className="font-semibold text-on-surface">{invoices.length}</span> invoices
             </span>
             <span className="text-outline">|</span>
             <div className="flex items-center gap-1 text-outline">
@@ -705,9 +694,10 @@ export const AdminInvoicesPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 font-semibold rounded-lg bg-primary text-on-primary hover:bg-primary-container"
+                  disabled={isSubmittingPay}
+                  className="px-4 py-2 font-semibold rounded-lg bg-primary text-on-primary hover:bg-primary-container disabled:opacity-50"
                 >
-                  Confirm Settlement
+                  {isSubmittingPay ? 'Recording...' : 'Confirm Settlement'}
                 </button>
               </div>
             </form>

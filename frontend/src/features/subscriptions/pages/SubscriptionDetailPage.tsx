@@ -1,78 +1,135 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { subscriptionService } from '../services/subscription.service';
+import { api } from '@/services/api';
+import { formatINR } from '@/lib/format';
 import { toast } from 'sonner';
 
 export const SubscriptionDetailPage: React.FC = () => {
-  const { id = 'SUB-8941' } = useParams();
+  const { id = '' } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Interactive states
   const [activeTab, setActiveTab] = useState<'invoices' | 'addons' | 'payment' | 'audit'>('invoices');
-  const [status, setStatus] = useState<'Active' | 'Paused' | 'Closed'>('Active');
-  const allocatedSeats = 25;
-  const [extraSeats, setExtraSeats] = useState<number>(5);
-  const [isAddingSeats, setIsAddingSeats] = useState<boolean>(false);
-  const [newSeatsInput, setNewSeatsInput] = useState<number>(5);
   const [filterStatus, setFilterStatus] = useState<string>('All Statuses');
   const [autoRenew, setAutoRenew] = useState<boolean>(true);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [extraSeats, setExtraSeats] = useState<number>(0);
+  const [isAddingSeats, setIsAddingSeats] = useState<boolean>(false);
+  const [newSeatsInput, setNewSeatsInput] = useState<number>(0);
 
-  // Financial calculations
-  const basePrice = 240000;
-  const addonPerSeat = 4800;
-  const addonPrice = extraSeats * addonPerSeat;
-  const subtotal = basePrice + addonPrice;
-  const cgst = subtotal * 0.09;
-  const sgst = subtotal * 0.09;
-  const totalRecurring = subtotal + cgst + sgst;
+  // Fetch real subscription from database
+  const { data: sub, isLoading, isError } = useQuery({
+    queryKey: ['admin', 'subscription', id],
+    queryFn: () => subscriptionService.getSubscriptionById(id),
+    enabled: !!id,
+  });
 
-  const handleTogglePause = () => {
-    if (status === 'Active') {
-      setStatus('Paused');
-      toast.warning(`Subscription ${id} is now Paused. Automated billing runs suspended.`);
-    } else {
-      setStatus('Active');
-      toast.success(`Subscription ${id} has been Resumed to Active status.`);
-    }
-  };
-
-  const handleGenerateInvoice = () => {
-    toast.success(`Immediate billing invoice INV-2026-1049 generated for ₹${totalRecurring.toLocaleString('en-IN')}`);
-  };
+  const allocatedSeats = Number(sub?.quantity || 1);
 
   const handleSaveSeats = () => {
     setExtraSeats(newSeatsInput);
     setIsAddingSeats(false);
-    toast.success(`Allocated extra licenses updated to ${newSeatsInput} seats.`);
+    toast.success(`Updated seat allocation to +${newSeatsInput} extra seats.`);
   };
 
-  const invoices = [
-    {
-      id: 'INV-2026-1048',
-      date: 'Oct 14, 2026',
-      period: 'Oct 14, 2026 – Oct 13, 2027',
-      total: '₹2,83,200',
-      paid: '₹2,83,200',
-      status: 'Paid',
-    },
-    {
-      id: 'INV-2025-0812',
-      date: 'Oct 14, 2025',
-      period: 'Oct 14, 2025 – Oct 13, 2026',
-      total: '₹2,83,200',
-      paid: '₹2,83,200',
-      status: 'Paid',
-    },
-    {
-      id: 'INV-2024-0391',
-      date: 'Oct 14, 2024',
-      period: 'Oct 14, 2024 – Oct 13, 2025',
-      total: '₹2,83,200',
-      paid: '₹2,83,200',
-      status: 'Paid',
-    },
-  ];
+  if (isLoading) {
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 py-12 text-center text-xs text-on-surface-variant animate-pulse">
+        <div className="h-24 bg-surface-container-lowest rounded-xl border border-outline-variant"></div>
+        <div className="h-64 bg-surface-container-lowest rounded-xl border border-outline-variant"></div>
+      </div>
+    );
+  }
 
-  const filteredInvoices = invoices.filter((inv) => {
+  if (isError || !sub) {
+    return (
+      <div className="space-y-6 max-w-lg mx-auto px-4 py-12 text-center">
+        <div className="p-6 rounded-xl bg-error-container/20 border border-error/30 text-error space-y-3">
+          <h2 className="text-base font-bold">Subscription Not Found</h2>
+          <p className="text-xs">
+            No active database record was found for subscription identifier "{id}".
+          </p>
+          <button
+            onClick={() => navigate('/app/subscriptions')}
+            className="px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-on-primary"
+          >
+            Back to Subscriptions
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const customerName = sub.customer?.displayName || sub.customer?.companyName || 'Corporate Client';
+  const customerGstin = sub.customer?.taxIdentifier || '27AABCN1234F1Z8';
+  const customerEmail = sub.customer?.user?.email || 'billing@client.com';
+  const customerState = sub.customer?.state || 'Maharashtra';
+  const planName = sub.plan?.name || sub.lines?.[0]?.descriptionSnapshot || 'Subscription Plan';
+  const frequency = (sub.billingFrequency || 'MONTHLY').toLowerCase();
+  const status = sub.status;
+  const quantity = Number(sub.quantity || 1);
+
+  // Pricing
+  const basePrice = Number(sub.lines?.[0]?.unitPrice || sub.plan?.price || 0) * quantity;
+  const isIntraState = customerState.toLowerCase() === 'maharashtra';
+  const cgst = isIntraState ? basePrice * 0.09 : 0;
+  const sgst = isIntraState ? basePrice * 0.09 : 0;
+  const igst = !isIntraState ? basePrice * 0.18 : 0;
+  const totalRecurring = basePrice + cgst + sgst + igst;
+
+  const handleTogglePause = async () => {
+    setIsProcessing(true);
+    try {
+      if (status === 'ACTIVE') {
+        await api.post(`/subscriptions/${sub.id}/pause`);
+        toast.warning(`Subscription ${sub.subscriptionNumber} is now Paused.`);
+      } else {
+        await api.post(`/subscriptions/${sub.id}/resume`);
+        toast.success(`Subscription ${sub.subscriptionNumber} has been Resumed to Active.`);
+      }
+      queryClient.invalidateQueries({ queryKey: ['admin', 'subscription', id] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'subscriptions'] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Action failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleGenerateInvoice = async () => {
+    setIsProcessing(true);
+    try {
+      const res = await api.post(`/subscriptions/${sub.id}/generate-invoice`);
+      toast.success(res.data?.message || `Invoice generated for ${sub.subscriptionNumber}!`);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'subscription', id] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'invoices'] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to generate invoice');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const rawInvoices = sub.invoices || [];
+  const invoices = rawInvoices.map((inv: any) => {
+    const paidAmt = (inv.allocations || []).reduce(
+      (sum: number, a: any) => sum + Number(a.allocatedAmount || 0),
+      0
+    );
+    return {
+      id: inv.invoiceNumber || inv.id,
+      date: inv.issueDate ? new Date(inv.issueDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent',
+      period: `Cycle ${inv.id.slice(0, 6)}`,
+      total: formatINR(Number(inv.grandTotal || 0)),
+      paid: formatINR(paidAmt),
+      status: inv.status === 'PAID' ? 'Paid' : inv.status === 'CONFIRMED' ? 'Pending' : inv.status,
+    };
+  });
+
+  const filteredInvoices = invoices.filter((inv: any) => {
     if (filterStatus === 'Paid Only') return inv.status === 'Paid';
     if (filterStatus === 'Pending') return inv.status === 'Pending';
     return true;
@@ -103,17 +160,21 @@ export const SubscriptionDetailPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
             <div className="flex items-center flex-wrap gap-2.5 mb-1.5">
-              <span className="font-headline text-lg font-bold tracking-tight text-on-surface">{id}</span>
+              <span className="font-headline text-lg font-bold tracking-tight text-on-surface">
+                {sub.subscriptionNumber || id}
+              </span>
 
               {/* Status Pill */}
               <span
                 className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                  status === 'Active'
+                  status === 'ACTIVE'
                     ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200'
-                    : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200'
+                    : status === 'PAUSED'
+                    ? 'bg-amber-50 text-amber-800 ring-1 ring-amber-200'
+                    : 'bg-slate-100 text-slate-800 ring-1 ring-slate-200'
                 }`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${status === 'Active' ? 'bg-emerald-600' : 'bg-amber-600'}`}></span>
+                <span className={`w-1.5 h-1.5 rounded-full ${status === 'ACTIVE' ? 'bg-emerald-600' : 'bg-amber-600'}`}></span>
                 {status}
               </span>
 
@@ -130,14 +191,16 @@ export const SubscriptionDetailPage: React.FC = () => {
                 {autoRenew ? 'Auto-renew enabled' : 'Auto-renew off'}
               </button>
 
-              <span className="text-xs text-outline font-normal">Created on Oct 14, 2024</span>
+              <span className="text-xs text-outline font-normal">
+                Started on {new Date(sub.startAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
             </div>
 
             <h1 className="text-2xl font-bold tracking-tight text-on-surface font-headline">
-              Nexarise Enterprise Platform Contract
+              {customerName} • {planName}
             </h1>
             <p className="text-xs text-on-surface-variant mt-1">
-              Multi-region deployment cluster • Managed billing entity registered in India
+              Active recurring contract registered under {customerName} • {sub.subscriptionNumber}
             </p>
           </div>
 
@@ -145,12 +208,13 @@ export const SubscriptionDetailPage: React.FC = () => {
           <div className="flex items-center gap-2.5 flex-wrap">
             <button
               onClick={handleTogglePause}
+              disabled={isProcessing}
               className="px-3.5 py-2 text-xs font-semibold rounded-lg border border-outline text-on-surface hover:bg-surface-container transition-colors duration-150 flex items-center gap-1.5"
             >
               <span className="material-symbols-outlined text-base">
-                {status === 'Active' ? 'pause_circle' : 'play_circle'}
+                {status === 'ACTIVE' ? 'pause_circle' : 'play_circle'}
               </span>
-              <span>{status === 'Active' ? 'Pause Subscription' : 'Resume Subscription'}</span>
+              <span>{status === 'ACTIVE' ? 'Pause Subscription' : 'Resume Subscription'}</span>
             </button>
 
             <button
@@ -163,6 +227,7 @@ export const SubscriptionDetailPage: React.FC = () => {
 
             <button
               onClick={handleGenerateInvoice}
+              disabled={isProcessing}
               className="px-4 py-2 text-xs font-semibold rounded-lg bg-primary-container text-on-primary hover:bg-primary transition-all duration-150 shadow-sm flex items-center gap-1.5 active:scale-95"
             >
               <span className="material-symbols-outlined text-base fill">bolt</span>
@@ -178,31 +243,28 @@ export const SubscriptionDetailPage: React.FC = () => {
         <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 shadow-sm hover:border-primary-container transition-all">
           <div className="flex items-start justify-between">
             <span className="text-xs font-semibold text-on-surface-variant tracking-wider uppercase">Plan &amp; Frequency</span>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-secondary-container text-on-secondary-container">
-              TIER 3
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-secondary-container text-on-secondary-container uppercase">
+              {frequency}
             </span>
           </div>
           <div className="mt-3">
-            <h2 className="text-lg font-bold text-on-surface">Enterprise Annual</h2>
+            <h2 className="text-lg font-bold text-on-surface">{planName}</h2>
             <div className="mt-1 flex items-baseline gap-1.5">
-              <span className="text-2xl font-extrabold text-on-surface tracking-tight">₹2,40,000</span>
-              <span className="text-xs text-on-surface-variant font-medium">/ year</span>
+              <span className="text-2xl font-extrabold text-on-surface tracking-tight">{formatINR(basePrice)}</span>
+              <span className="text-xs text-on-surface-variant font-medium">/ {frequency}</span>
             </div>
             <p className="text-xs text-on-surface-variant mt-2 flex items-center gap-1.5">
               <span className="material-symbols-outlined text-sm text-primary">event_repeat</span>
-              Billed annually on Oct 14
+              Billed {frequency} recurring
             </p>
           </div>
           <div className="mt-4 pt-3 border-t border-outline-variant/60 flex items-center justify-between text-xs">
-            <span className="text-outline">Includes {allocatedSeats} user seats</span>
+            <span className="text-outline">Quantity: {quantity} license{quantity > 1 ? 's' : ''}</span>
             <button
-              onClick={() => {
-                setActiveTab('addons');
-                setIsAddingSeats(true);
-              }}
+              onClick={() => setActiveTab('invoices')}
               className="text-primary font-semibold hover:underline"
             >
-              Manage Add-ons
+              View Invoices
             </button>
           </div>
         </div>
@@ -214,17 +276,17 @@ export const SubscriptionDetailPage: React.FC = () => {
             <span className="material-symbols-outlined text-outline text-lg">corporate_fare</span>
           </div>
           <div className="mt-3">
-            <h2 className="text-base font-bold text-on-surface truncate">Nexarise Technologies Pvt Ltd</h2>
+            <h2 className="text-base font-bold text-on-surface truncate">{customerName}</h2>
             <p className="text-xs text-on-surface-variant mt-0.5">
-              Key Contact: <span className="text-on-surface font-semibold">Arjun Nair</span>
+              Corporate Account: <span className="text-on-surface font-semibold">{sub.customer?.customerCode || 'Registered'}</span>
             </p>
-            <p className="text-xs text-primary font-medium mt-1 truncate hover:underline cursor-pointer">billing@nexarise.io</p>
+            <p className="text-xs text-primary font-medium mt-1 truncate hover:underline cursor-pointer">{customerEmail}</p>
             <div className="mt-2.5 inline-block text-[11px] font-mono px-2 py-0.5 rounded bg-surface-container text-on-surface-variant border border-outline-variant/70">
-              GSTIN: 27AABCN1234F1Z8
+              GSTIN: {customerGstin}
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-outline-variant/60 flex items-center justify-between text-xs">
-            <span className="text-outline">Tax Location: Maharashtra (27)</span>
+            <span className="text-outline">Tax Location: {customerState}</span>
             <Link to="/app/customers" className="text-primary font-semibold hover:underline">
               View Client CRM
             </Link>
@@ -239,22 +301,23 @@ export const SubscriptionDetailPage: React.FC = () => {
           </div>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
-              <h2 className="text-lg font-bold text-on-surface">Oct 14, 2027</h2>
-              <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-medium">In 238 days</span>
+              <h2 className="text-lg font-bold text-on-surface">
+                {sub.nextBillingAt ? new Date(sub.nextBillingAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Continuous'}
+              </h2>
             </div>
             <div className="mt-1 flex items-baseline gap-1.5">
-              <span className="text-2xl font-extrabold text-on-surface tracking-tight">₹2,83,200</span>
+              <span className="text-2xl font-extrabold text-on-surface tracking-tight">{formatINR(totalRecurring)}</span>
               <span className="text-xs text-on-surface-variant">(incl. 18% GST)</span>
             </div>
             <p className="text-xs text-on-surface-variant mt-2 flex items-center gap-1.5">
               <span className="material-symbols-outlined text-sm text-outline">credit_card</span>
-              HDFC Bank Auto-Debit (•••• 4921)
+              Online Razorpay / Bank Debit
             </p>
           </div>
           <div className="mt-4 pt-3 border-t border-outline-variant/60 flex items-center justify-between text-xs">
-            <span className="text-outline">Mandate ID: NACH-9920148</span>
+            <span className="text-outline">Auto-renew active</span>
             <button onClick={() => setActiveTab('payment')} className="text-primary font-semibold hover:underline">
-              Update Payment
+              Payment Rail
             </button>
           </div>
         </div>
@@ -368,7 +431,7 @@ export const SubscriptionDetailPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant/60 text-xs">
-                      {filteredInvoices.map((inv) => (
+                      {filteredInvoices.map((inv: any) => (
                         <tr key={inv.id} className="hover:bg-surface-container-low/50 transition-colors">
                           <td className="py-4 px-5 font-semibold text-primary flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-outline text-sm">description</span>
@@ -568,29 +631,27 @@ export const SubscriptionDetailPage: React.FC = () => {
 
             <div className="mt-4 space-y-2.5 text-xs">
               <div className="flex items-center justify-between text-on-surface-variant">
-                <span>Base Subscription (Annual)</span>
-                <span className="font-medium text-on-surface">₹{basePrice.toLocaleString('en-IN')}.00</span>
+                <span>Base Subscription ({frequency})</span>
+                <span className="font-medium text-on-surface">{formatINR(basePrice)}</span>
               </div>
 
-              <div className="flex items-center justify-between text-on-surface-variant">
-                <span className="flex items-center gap-1">
-                  Add-on Seats ({extraSeats} extra)
-                  <span className="material-symbols-outlined text-[13px] text-outline" title="₹4,800/yr per seat">
-                    info
-                  </span>
-                </span>
-                <span className="font-medium text-on-surface">₹{addonPrice.toLocaleString('en-IN')}.00</span>
-              </div>
-
-              <div className="flex items-center justify-between text-on-surface-variant">
-                <span>CGST (9.0%)</span>
-                <span className="font-medium text-on-surface">₹{cgst.toLocaleString('en-IN')}.00</span>
-              </div>
-
-              <div className="flex items-center justify-between text-on-surface-variant">
-                <span>SGST (9.0%)</span>
-                <span className="font-medium text-on-surface">₹{sgst.toLocaleString('en-IN')}.00</span>
-              </div>
+              {isIntraState ? (
+                <>
+                  <div className="flex items-center justify-between text-on-surface-variant">
+                    <span>CGST (9.0%)</span>
+                    <span className="font-medium text-on-surface">{formatINR(cgst)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-on-surface-variant">
+                    <span>SGST (9.0%)</span>
+                    <span className="font-medium text-on-surface">{formatINR(sgst)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-between text-on-surface-variant">
+                  <span>IGST (18.0%)</span>
+                  <span className="font-medium text-on-surface">{formatINR(igst)}</span>
+                </div>
+              )}
 
               {/* Divider */}
               <div className="pt-3 border-t border-outline-variant"></div>
@@ -599,10 +660,12 @@ export const SubscriptionDetailPage: React.FC = () => {
               <div className="flex items-baseline justify-between pt-1">
                 <div>
                   <span className="text-xs font-bold text-on-surface uppercase tracking-wide">Total Recurring</span>
-                  <p className="text-[10px] text-on-surface-variant">Next invoice scheduled: Oct 14, 2027</p>
+                  <p className="text-[10px] text-on-surface-variant">
+                    Next invoice: {sub.nextBillingAt ? new Date(sub.nextBillingAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Continuous'}
+                  </p>
                 </div>
                 <span className="text-xl font-black text-primary tracking-tight">
-                  ₹{totalRecurring.toLocaleString('en-IN')}
+                  {formatINR(totalRecurring)}
                 </span>
               </div>
             </div>
@@ -708,7 +771,7 @@ export const SubscriptionDetailPage: React.FC = () => {
               <div className="flex items-center justify-center gap-4 py-2">
                 <button
                   type="button"
-                  onClick={() => setNewSeatsInput((s) => Math.max(0, s - 1))}
+                  onClick={() => setNewSeatsInput((s: number) => Math.max(0, s - 1))}
                   className="w-10 h-10 rounded-lg border border-outline flex items-center justify-center text-lg font-bold hover:bg-surface-container"
                 >
                   -
@@ -719,7 +782,7 @@ export const SubscriptionDetailPage: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setNewSeatsInput((s) => s + 1)}
+                  onClick={() => setNewSeatsInput((s: number) => s + 1)}
                   className="w-10 h-10 rounded-lg border border-outline flex items-center justify-center text-lg font-bold hover:bg-surface-container"
                 >
                   +

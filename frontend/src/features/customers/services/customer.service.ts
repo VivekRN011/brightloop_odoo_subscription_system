@@ -69,25 +69,38 @@ export const customerService = {
     try {
       const response = await api.get('/customers', { params });
       const payload = response.data?.data || response.data;
-      const items = Array.isArray(payload) ? payload : payload.items || payload.customers;
-      if (Array.isArray(items) && items.length > 0) {
-        return items.map((c: any) => ({
-          id: c.id,
-          customerCode: c.customerCode,
-          displayName: c.displayName,
-          companyName: c.companyName,
-          email: c.user?.email || c.email || 'billing@client.com',
-          phone: c.phone || 'N/A',
-          city: c.city || 'India',
-          state: c.state || 'N/A',
-          subscriptionsCount: c._count?.subscriptions || c.subscriptions?.length || 1,
-          totalInvoiced: 50000,
-        }));
+      const items = Array.isArray(payload) ? payload : payload?.items || payload?.customers || [];
+      if (Array.isArray(items)) {
+        return items.map((c: any) => {
+          const totalInvoiced = Array.isArray(c.invoices)
+            ? c.invoices.reduce((sum: number, inv: any) => sum + Number(inv.grandTotal || 0), 0)
+            : Number(c.totalInvoiced || 0);
+
+          return {
+            id: c.id,
+            customerCode: c.customerCode,
+            displayName: c.displayName,
+            companyName: c.companyName || c.displayName,
+            email: c.user?.email || c.email || 'billing@client.com',
+            phone: c.phone || 'N/A',
+            city: c.city || 'India',
+            state: c.state || 'Maharashtra',
+            taxIdentifier: c.taxIdentifier,
+            subscriptionsCount: c._count?.subscriptions ?? c.subscriptions?.length ?? 0,
+            totalInvoiced,
+          };
+        });
       }
-      return mockAdminCustomers;
-    } catch {
-      return mockAdminCustomers;
+      return [];
+    } catch (err) {
+      console.error('Failed to load customers from API:', err);
+      return [];
     }
+  },
+
+  async getCustomerById(id: string): Promise<any> {
+    const response = await api.get(`/customers/${id}`);
+    return response.data?.data || response.data;
   },
 
   async createCustomer(data: {

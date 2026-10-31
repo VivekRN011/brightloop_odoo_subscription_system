@@ -125,23 +125,42 @@ export class InvoicesService {
   }
 
   static async getInvoiceById(id: string) {
-    const invoice = await prisma.invoice.findUnique({
-      where: { id },
-      include: {
-        customer: true,
-        subscription: true,
-        lines: {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id).trim());
+    const invoice = isUuid
+      ? await prisma.invoice.findUnique({
+          where: { id },
           include: {
-            product: true,
+            customer: true,
+            subscription: true,
+            lines: {
+              include: {
+                product: true,
+              },
+            },
+            allocations: {
+              include: {
+                payment: true,
+              },
+            },
           },
-        },
-        allocations: {
+        })
+      : await prisma.invoice.findFirst({
+          where: { invoiceNumber: id },
           include: {
-            payment: true,
+            customer: true,
+            subscription: true,
+            lines: {
+              include: {
+                product: true,
+              },
+            },
+            allocations: {
+              include: {
+                payment: true,
+              },
+            },
           },
-        },
-      },
-    });
+        });
 
     if (!invoice) {
       throw new Error("Invoice not found");

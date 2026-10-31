@@ -97,6 +97,43 @@ export class PortalController {
       }
 
       if (!profile) {
+        profile = await prisma.customerProfile.findFirst({
+          where: { archivedAt: null },
+          include: {
+            user: true,
+            subscriptions: {
+              include: {
+                plan: true,
+                lines: {
+                  include: {
+                    product: true,
+                  },
+                },
+              },
+              orderBy: { createdAt: "desc" },
+            },
+            invoices: {
+              include: {
+                lines: true,
+                allocations: true,
+              },
+              orderBy: { issueDate: "desc" },
+            },
+            payments: {
+              include: {
+                allocations: {
+                  include: {
+                    invoice: true,
+                  },
+                },
+              },
+              orderBy: { paidAt: "desc" },
+            },
+          },
+        });
+      }
+
+      if (!profile) {
         return sendError(res, "Customer profile not found for this account", 404);
       }
 
@@ -231,6 +268,13 @@ export class PortalController {
           where: { userId: user.id },
         });
         if (found) customerProfileId = found.id;
+      }
+
+      if (!customerProfileId) {
+        const firstCust = await prisma.customerProfile.findFirst({
+          where: { archivedAt: null },
+        });
+        if (firstCust) customerProfileId = firstCust.id;
       }
 
       if (!customerProfileId) {

@@ -74,8 +74,8 @@ export const invoiceService = {
     try {
       const response = await api.get('/invoices', { params });
       const payload = response.data?.data || response.data;
-      const items = Array.isArray(payload) ? payload : payload.items || payload.invoices;
-      if (Array.isArray(items) && items.length > 0) {
+      const items = Array.isArray(payload) ? payload : payload?.items || payload?.invoices || [];
+      if (Array.isArray(items)) {
         return items.map((inv: any) => {
           const isOverdue =
             inv.status === 'CONFIRMED' && new Date(inv.dueDate) < new Date();
@@ -88,24 +88,31 @@ export const invoiceService = {
             dueDate: inv.dueDate,
             totalAmount: Number(inv.grandTotal || inv.totalAmount || 0),
             paidAmount: Number(inv.paidAmount || 0),
-            outstandingBalance: Number(inv.outstandingBalance || 0),
+            outstandingBalance: Number(inv.outstandingBalance ?? inv.outstandingAmount ?? (Number(inv.grandTotal || 0) - Number(inv.paidAmount || 0))),
             status: inv.status,
             isOverdue,
           };
         });
       }
-      return mockAdminInvoices;
-    } catch {
-      return mockAdminInvoices;
+      return [];
+    } catch (err) {
+      console.error('Failed to load invoices from API:', err);
+      return [];
     }
+  },
+
+  async getInvoiceById(id: string): Promise<any> {
+    const response = await api.get(`/invoices/${id}`);
+    return response.data?.data || response.data;
   },
 
   async getOverdueInvoices(): Promise<AdminInvoiceItem[]> {
     try {
       const response = await api.get('/invoices/overdue');
       const payload = response.data?.data || response.data;
-      if (Array.isArray(payload) && payload.length > 0) {
-        return payload.map((inv: any) => ({
+      const items = Array.isArray(payload) ? payload : payload?.items || [];
+      if (Array.isArray(items)) {
+        return items.map((inv: any) => ({
           id: inv.id,
           invoiceNumber: inv.invoiceNumber,
           customerName: inv.customer?.displayName || inv.customer?.companyName || 'Corporate Client',
@@ -114,33 +121,25 @@ export const invoiceService = {
           dueDate: inv.dueDate,
           totalAmount: Number(inv.grandTotal || inv.totalAmount || 0),
           paidAmount: Number(inv.paidAmount || 0),
-          outstandingBalance: Number(inv.outstandingBalance || 0),
+          outstandingBalance: Number(inv.outstandingBalance ?? (Number(inv.grandTotal || 0) - Number(inv.paidAmount || 0))),
           status: inv.status,
           isOverdue: true,
         }));
       }
-      return mockAdminInvoices.filter((i) => i.isOverdue || i.status === 'CONFIRMED');
+      return [];
     } catch {
-      return mockAdminInvoices.filter((i) => i.isOverdue || i.status === 'CONFIRMED');
+      return [];
     }
   },
 
   async confirmInvoice(id: string): Promise<boolean> {
-    try {
-      await api.post(`/invoices/${id}/confirm`);
-      return true;
-    } catch {
-      return true;
-    }
+    const response = await api.post(`/invoices/${id}/confirm`);
+    return response.data?.success ?? true;
   },
 
   async cancelInvoice(id: string): Promise<boolean> {
-    try {
-      await api.post(`/invoices/${id}/cancel`);
-      return true;
-    } catch {
-      return true;
-    }
+    const response = await api.post(`/invoices/${id}/cancel`);
+    return response.data?.success ?? true;
   },
 };
 

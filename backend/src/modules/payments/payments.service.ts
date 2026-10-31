@@ -74,20 +74,36 @@ export class PaymentsService {
   }
 
   static async getPaymentById(id: string) {
-    const payment = await prisma.payment.findUnique({
-      where: { id },
-      include: {
-        customer: true,
-        recordedBy: {
-          select: { id: true, email: true },
-        },
-        allocations: {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id).trim());
+    const payment = isUuid
+      ? await prisma.payment.findUnique({
+          where: { id },
           include: {
-            invoice: true,
+            customer: true,
+            recordedBy: {
+              select: { id: true, email: true },
+            },
+            allocations: {
+              include: {
+                invoice: true,
+              },
+            },
           },
-        },
-      },
-    });
+        })
+      : await prisma.payment.findFirst({
+          where: { paymentNumber: id },
+          include: {
+            customer: true,
+            recordedBy: {
+              select: { id: true, email: true },
+            },
+            allocations: {
+              include: {
+                invoice: true,
+              },
+            },
+          },
+        });
 
     if (!payment) {
       throw new Error("Payment not found");
@@ -112,14 +128,22 @@ export class PaymentsService {
       );
     }
 
+    const isUuid = (val: string) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val).trim());
+
     return await prisma.$transaction(async (tx) => {
-      // 1. Validate customer existence and active status
-      const customer = await tx.customerProfile.findUnique({
-        where: { id: input.customerId },
-      });
-      if (!customer) {
-        throw new Error("Customer profile not found");
-      }
+      // 1. Resolve customer
+      let customer = isUuid(input.customerId)
+        ? await tx.customerProfile.findUnique({ where: { id: input.customerId } })
+        : await tx.customerProfile.findFirst({
+            where: {
+              OR: [
+                { customerCode: input.customerId },
+                { displayName: { contains: input.customerId, mode: 'insensitive' } },
+                { companyName: { contains: input.customerId, mode: 'insensitive' } },
+              ],
+            },
+          });
 
       // 2. Validate all invoice allocations upfront
       for (const alloc of allocations) {
@@ -127,20 +151,31 @@ export class PaymentsService {
           throw new Error("Allocation amount must be positive");
         }
 
-        const inv = await tx.invoice.findUnique({
-          where: { id: alloc.invoiceId },
-          include: { allocations: true },
-        });
+        const inv = isUuid(alloc.invoiceId)
+          ? await tx.invoice.findUnique({
+              where: { id: alloc.invoiceId },
+              include: { allocations: true },
+            })
+          : await tx.invoice.findFirst({
+              where: { invoiceNumber: alloc.invoiceId },
+              include: { allocations: true },
+            });
 
         if (!inv) {
-          throw new Error(`Invoice with ID ${alloc.invoiceId} does not exist`);
+          throw new Error(`Invoice with reference ${alloc.invoiceId} does not exist`);
         }
 
-        if (inv.customerId !== input.customerId) {
+        if (!customer) {
+          customer = await tx.customerProfile.findUnique({ where: { id: inv.customerId } });
+        }
+
+        if (customer && inv.customerId !== customer.id) {
           throw new Error(
             `Invoice ${inv.invoiceNumber} does not belong to customer ${customer.displayName}`
           );
         }
+
+        alloc.invoiceId = inv.id; // Map to canonical UUID
 
         if (inv.currency !== input.currency) {
           throw new Error(
@@ -167,11 +202,15 @@ export class PaymentsService {
         }
       }
 
+      if (!customer) {
+        throw new Error("Customer profile not found for this payment");
+      }
+
       // 3. Create the payment record with allocations
       const payment = await tx.payment.create({
         data: {
           paymentNumber,
-          customerId: input.customerId,
+          customerId: customer.id,
           method: input.method,
           amount: input.amount,
           currency: input.currency,

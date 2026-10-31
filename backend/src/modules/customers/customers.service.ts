@@ -62,38 +62,77 @@ export class CustomersService {
   }
 
   static async getCustomerById(id: string) {
-    const customer = await prisma.customerProfile.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            role: true,
-            status: true,
-            lastLoginAt: true,
-          },
-        },
-        subscriptions: {
-          orderBy: { createdAt: "desc" },
-          take: 10,
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id).trim());
+    const customer = isUuid
+      ? await prisma.customerProfile.findUnique({
+          where: { id },
           include: {
-            plan: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+                role: true,
+                status: true,
+                lastLoginAt: true,
+              },
+            },
+            subscriptions: {
+              orderBy: { createdAt: "desc" },
+              take: 10,
+              include: {
+                plan: true,
+              },
+            },
+            invoices: {
+              orderBy: { issueDate: "desc" },
+              take: 10,
+              include: {
+                allocations: true,
+              },
+            },
+            payments: {
+              orderBy: { paidAt: "desc" },
+              take: 10,
+            },
           },
-        },
-        invoices: {
-          orderBy: { issueDate: "desc" },
-          take: 10,
+        })
+      : await prisma.customerProfile.findFirst({
+          where: {
+            OR: [
+              { customerCode: id },
+              { displayName: { equals: id, mode: "insensitive" } },
+            ],
+          },
           include: {
-            allocations: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+                role: true,
+                status: true,
+                lastLoginAt: true,
+              },
+            },
+            subscriptions: {
+              orderBy: { createdAt: "desc" },
+              take: 10,
+              include: {
+                plan: true,
+              },
+            },
+            invoices: {
+              orderBy: { issueDate: "desc" },
+              take: 10,
+              include: {
+                allocations: true,
+              },
+            },
+            payments: {
+              orderBy: { paidAt: "desc" },
+              take: 10,
+            },
           },
-        },
-        payments: {
-          orderBy: { paidAt: "desc" },
-          take: 10,
-        },
-      },
-    });
+        });
 
     if (!customer || customer.archivedAt) {
       throw new Error("Customer not found");

@@ -1,6 +1,7 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { planService } from '../services/plan.service';
 import type { SubscriptionPlan, BillingFrequency } from '../models/plan.types';
+import { formatINR } from '@/lib/format';
 import { toast } from 'sonner';
 
 export const AdminPlansPage: React.FC = () => {
@@ -138,48 +139,55 @@ export const AdminPlansPage: React.FC = () => {
           </div>
           <div className="mt-3">
             <span className="text-2xl font-extrabold text-on-surface font-headline">{plans.length}</span>
-            <span className="text-xs text-on-surface-variant ml-2">4 Cadences</span>
+            <span className="text-xs text-on-surface-variant ml-2">Total Plans</span>
           </div>
           <div className="text-[11px] text-emerald-700 mt-2 flex items-center gap-1 font-medium">
             <span className="material-symbols-outlined text-xs">check_circle</span>
-            All 4 cadences compliant (Daily/Wk/Mo/Yr)
+            {plans.filter((p) => p.isActive).length} currently active in catalog
           </div>
         </div>
 
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-on-surface-variant font-semibold">
-            <span>Highest ARR Tier</span>
-            <span className="material-symbols-outlined text-primary text-lg">workspace_premium</span>
+            <span>Active Billing Cadences</span>
+            <span className="material-symbols-outlined text-primary text-lg">autorenew</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-primary font-headline">Enterprise</span>
-            <span className="text-xs text-on-surface-variant ml-2">Γé╣2.88 Cr ARR</span>
+            <span className="text-2xl font-extrabold text-primary font-headline">
+              {new Set(plans.map((p) => p.billingFrequency)).size}
+            </span>
+            <span className="text-xs text-on-surface-variant ml-2">Frequencies</span>
           </div>
-          <div className="text-[11px] text-on-surface-variant mt-2">78% of active customer subscriptions</div>
+          <div className="text-[11px] text-on-surface-variant mt-2">Daily, Weekly, Monthly, Yearly</div>
         </div>
 
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-on-surface-variant font-semibold">
-            <span>Average Contract Value</span>
+            <span>Active Rate Range</span>
             <span className="material-symbols-outlined text-primary text-lg">trending_up</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-on-surface font-headline">Γé╣48,200</span>
-            <span className="text-xs text-on-surface-variant ml-2">/ billing run</span>
+            <span className="text-xl font-extrabold text-on-surface font-headline">
+              {plans.length > 0
+                ? `${formatINR(Math.min(...plans.map((p) => p.price)))} – ${formatINR(Math.max(...plans.map((p) => p.price)))}`
+                : '₹0'}
+            </span>
           </div>
-          <div className="text-[11px] text-emerald-700 mt-2 font-medium">+14.2% expansion rate</div>
+          <div className="text-[11px] text-emerald-700 mt-2 font-medium">GST compliant recurring tiers</div>
         </div>
 
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-on-surface-variant font-semibold">
-            <span>Active Subscribers</span>
-            <span className="material-symbols-outlined text-primary text-lg">group</span>
+            <span>Auto-Renewal Enabled</span>
+            <span className="material-symbols-outlined text-primary text-lg">verified</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-on-surface font-headline">1,428</span>
-            <span className="text-xs text-on-surface-variant ml-2">entities</span>
+            <span className="text-2xl font-extrabold text-on-surface font-headline">
+              {plans.filter((p) => p.allowRenewal).length}
+            </span>
+            <span className="text-xs text-on-surface-variant ml-2">of {plans.length} plans</span>
           </div>
-          <div className="text-[11px] text-on-surface-variant mt-2">Auto-renewal enabled on 96%</div>
+          <div className="text-[11px] text-on-surface-variant mt-2">NACH &amp; AutoPay compliant</div>
         </div>
       </section>
 

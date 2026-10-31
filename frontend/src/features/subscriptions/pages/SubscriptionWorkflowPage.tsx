@@ -1,49 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useProducts } from '@/features/products/hooks/useProducts';
 import { usePlans } from '@/features/plans/hooks/usePlans';
-import { customerPortalService } from '@/features/customer-portal/services/customerPortal.service';
+import { useAuth } from '@/context/AuthContext';
+import { api } from '@/services/api';
+import { launchRazorpayCheckout } from '@/features/customer-portal/services/razorpayClient.service';
+import { formatINR } from '@/lib/format';
 import { toast } from 'sonner';
 
 export const SubscriptionWorkflowPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const { data: products = [] } = useProducts();
   const { data: plans = [] } = usePlans();
 
   const queryProduct = searchParams.get('product') || '';
-  const queryPlan = searchParams.get('plan') || 'PLAN-ENT-Y';
+  const queryPlan = searchParams.get('plan') || '';
+
+  // Selected Product & Plan
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  const [extraSeats, setExtraSeats] = useState(0);
 
   // Customer & Tax Entity Form
-  const [companyName, setCompanyName] = useState('Nexarise Technologies Pvt Ltd');
+  const [companyName, setCompanyName] = useState('');
   const [taxIdentifier, setTaxIdentifier] = useState('27AABCN1234F1Z8');
-  const [billingEmail, setBillingEmail] = useState('billing@nexarise.io');
+  const [billingEmail, setBillingEmail] = useState('');
   const [state, setState] = useState('Maharashtra');
 
-  // Plan & Seats
-  const [selectedPlanCode, setSelectedPlanCode] = useState(queryPlan);
-  const [extraSeats, setExtraSeats] = useState(5);
+  // Discount
   const [discountCode, setDiscountCode] = useState('');
   const [discountPct, setDiscountPct] = useState(0);
 
-  // e-Mandate
+  // Mandate & Consent
   const [mandateTab, setMandateTab] = useState<'netbanking' | 'upi' | 'card'>('netbanking');
   const [selectedBank, setSelectedBank] = useState('HDFC');
-  const [upiId, setUpiId] = useState('nexarise@okhdfcbank');
+  const [upiId, setUpiId] = useState('');
   const [termsAgreed, setTermsAgreed] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Pricing calculations
-  const isYearly = selectedPlanCode.includes('Y') || selectedPlanCode.includes('ENT');
-  const basePrice = isYearly ? 240000 : 48000;
-  const addonPerSeat = isYearly ? 4800 : 600;
+  useEffect(() => {
+    if (user) {
+      if (!companyName && user.companyName) setCompanyName(user.companyName);
+      if (!billingEmail && user.email) setBillingEmail(user.email);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (products.length > 0 && !selectedProductId) {
+      const match = queryProduct
+        ? products.find((p) => p.id === queryProduct || p.sku === queryProduct) || products[0]
+        : products[0];
+      setSelectedProductId(match.id);
+    }
+  }, [products, queryProduct, selectedProductId]);
+
+  useEffect(() => {
+    if (plans.length > 0 && !selectedPlanId) {
+      const match = queryPlan
+        ? plans.find((pl) => pl.code === queryPlan || pl.id === queryPlan) || plans[0]
+        : plans.find((pl) => pl.billingFrequency === 'MONTHLY') || plans[0];
+      setSelectedPlanId(match.id);
+    }
+  }, [plans, queryPlan, selectedPlanId]);
+
+  const activeProduct = products.find((p) => p.id === selectedProductId) || products[0];
+  const activePlan = plans.find((p) => p.id === selectedPlanId || p.code === selectedPlanId) || plans[0];
+
+  // Authoritative base price:
+  const productPrice = activeProduct ? Number(activeProduct.salesPrice || 0) : 0;
+  const planPrice = activePlan ? Number(activePlan.price || 0) : 0;
+  const basePrice = productPrice > 0 ? productPrice : planPrice;
+
+  const addonPerSeat = Math.round(basePrice * 0.1);
   const addonsTotal = extraSeats * addonPerSeat;
   const subtotalBeforeDiscount = basePrice + addonsTotal;
   const discountAmount = subtotalBeforeDiscount * (discountPct / 100);
   const taxableSubtotal = Math.max(0, subtotalBeforeDiscount - discountAmount);
 
-  // Tax calculation: Maharashtra is Intra-State (CGST 9% + SGST 9%), else IGST (18%)
   const isIntraState = state === 'Maharashtra';
   const cgst = isIntraState ? taxableSubtotal * 0.09 : 0;
   const sgst = isIntraState ? taxableSubtotal * 0.09 : 0;
@@ -53,7 +89,7 @@ export const SubscriptionWorkflowPage: React.FC = () => {
   const handleApplyDiscount = () => {
     if (discountCode.trim().toUpperCase() === 'EARLY10') {
       setDiscountPct(10);
-      toast.success('Applied 10% Early Bird Discount!');
+      toast.success('Applied 10% Early Adopter Discount!');
     } else if (discountCode.trim().toUpperCase() === 'HACKATHON2026') {
       setDiscountPct(15);
       toast.success('Applied 15% Odoo Hackathon 2026 Discount!');
@@ -68,25 +104,52 @@ export const SubscriptionWorkflowPage: React.FC = () => {
       toast.error('Please accept the RBI e-Mandate authorization terms.');
       return;
     }
+    if (!activeProduct || !activePlan) {
+      toast.error('Please select a product and a subscription plan.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const activeProd = products.find((p) => p.id === queryProduct) || products[0];
-      const activePlan = plans.find((p) => p.code === selectedPlanCode) || plans[0];
-
-      await customerPortalService.createSubscription({
-        productId: activeProd?.id || 'prod-001',
-        planId: activePlan?.id || 'plan-ent-annual',
-        quantity: 1,
+      // 1. Create subscription & initial invoice
+      const res = await api.post('/portal/subscriptions', {
+        productId: activeProduct.id,
+        planId: activePlan.id,
+        quantity: 1 + extraSeats,
+        discountAmount: discountAmount > 0 ? discountAmount : undefined,
       });
 
-      toast.success('e-Mandate registered and Enterprise Subscription contract activated!');
-      navigate('/portal');
-    } catch {
-      toast.success('e-Mandate registered and Enterprise Subscription contract activated!');
-      navigate('/portal');
-    } finally {
+      const responseData = res.data?.data;
+      const invoice = responseData?.invoice;
+
+      if (!invoice || !invoice.id) {
+        toast.success('Subscription registered successfully!');
+        navigate('/portal');
+        return;
+      }
+
+      // 2. Launch Razorpay Checkout
+      await launchRazorpayCheckout({
+        invoiceId: invoice.id,
+        onSuccess: () => {
+          setIsSubmitting(false);
+          toast.success('Payment verified! Subscription is active.');
+          navigate('/portal');
+        },
+        onError: (err) => {
+          setIsSubmitting(false);
+          toast.error(err);
+          navigate('/portal/invoices');
+        },
+        onDismiss: () => {
+          setIsSubmitting(false);
+          toast.info(`Invoice ${invoice.invoiceNumber} generated. Complete payment in your Invoices tab.`);
+          navigate('/portal/invoices');
+        },
+      });
+    } catch (err: any) {
       setIsSubmitting(false);
+      toast.error(err.response?.data?.message || err.message || 'Failed to initialize subscription checkout');
     }
   };
 
@@ -124,7 +187,7 @@ export const SubscriptionWorkflowPage: React.FC = () => {
 
         {/* 2-Column Split Layout (60% Form / 40% Sticky Order Summary) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* LEFT COLUMN: Forms & Mandate Details (cols 7) */}
+          {/* LEFT COLUMN: Forms & Mandate Details */}
           <form onSubmit={handleCheckout} className="lg:col-span-7 space-y-6">
             {/* Card 1: Customer & Tax Entity */}
             <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm space-y-4">
@@ -148,6 +211,7 @@ export const SubscriptionWorkflowPage: React.FC = () => {
                     type="text"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="e.g. Acme Enterprises Inc."
                     required
                     className="w-full bg-surface border border-outline-variant rounded-lg p-2.5 font-medium focus:ring-1 focus:ring-primary"
                   />
@@ -182,6 +246,7 @@ export const SubscriptionWorkflowPage: React.FC = () => {
                       <option value="Delhi">Delhi (07)</option>
                       <option value="Tamil Nadu">Tamil Nadu (33)</option>
                       <option value="Telangana">Telangana (36)</option>
+                      <option value="Kerala">Kerala (32)</option>
                     </select>
                   </div>
                 </div>
@@ -192,6 +257,7 @@ export const SubscriptionWorkflowPage: React.FC = () => {
                     type="email"
                     value={billingEmail}
                     onChange={(e) => setBillingEmail(e.target.value)}
+                    placeholder="billing@example.com"
                     required
                     className="w-full bg-surface border border-outline-variant rounded-lg p-2.5 font-medium focus:ring-1 focus:ring-primary"
                   />
@@ -206,19 +272,19 @@ export const SubscriptionWorkflowPage: React.FC = () => {
                   <span className="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-xs">
                     2
                   </span>
-                  <h2 className="text-base font-bold font-headline text-on-surface">Recurring Payment &amp; e-Mandate</h2>
+                  <h2 className="text-base font-bold font-headline text-on-surface">Payment Method &amp; Gateway</h2>
                 </div>
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container">
-                  RBI Compliant
+                  Razorpay Secured
                 </span>
               </div>
 
               {/* Payment Tabs */}
               <div className="flex items-center gap-2 border-b border-outline-variant/60 pb-2 text-xs">
                 {[
-                  { id: 'netbanking', label: 'NetBanking NACH e-Mandate', icon: 'account_balance' },
-                  { id: 'upi', label: 'UPI AutoPay', icon: 'qr_code_2' },
-                  { id: 'card', label: 'Corporate Card e-Mandate', icon: 'credit_card' },
+                  { id: 'netbanking', label: 'NetBanking / Auto-Debit', icon: 'account_balance' },
+                  { id: 'upi', label: 'UPI / AutoPay', icon: 'qr_code_2' },
+                  { id: 'card', label: 'Credit / Debit Card', icon: 'credit_card' },
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -236,11 +302,10 @@ export const SubscriptionWorkflowPage: React.FC = () => {
                 ))}
               </div>
 
-              {/* Tab Form */}
               {mandateTab === 'netbanking' && (
                 <div className="space-y-4 text-xs pt-2">
                   <div>
-                    <label className="block text-on-surface-variant font-semibold mb-1">Select Bank for NACH Debit</label>
+                    <label className="block text-on-surface-variant font-semibold mb-1">Preferred Bank</label>
                     <select
                       value={selectedBank}
                       onChange={(e) => setSelectedBank(e.target.value)}
@@ -254,11 +319,9 @@ export const SubscriptionWorkflowPage: React.FC = () => {
                     </select>
                   </div>
                   <div className="p-3.5 rounded-lg bg-surface-container-low text-[11px] text-on-surface-variant space-y-1">
-                    <p className="font-semibold text-on-surface">Standing Instruction (SI) Notice:</p>
+                    <p className="font-semibold text-on-surface">Razorpay Gateway Integration:</p>
                     <p>
-                      A standing e-mandate for maximum ₹5,00,000 will be authenticated via your bank netbanking portal.
-                      Actual debit executes on recurring renewal dates with 24h prior SMS/email notification as per RBI
-                      mandate.
+                      Clicking checkout will initiate the secure Razorpay payment modal with live UPI, NetBanking, and Card options.
                     </p>
                   </div>
                 </div>
@@ -267,45 +330,21 @@ export const SubscriptionWorkflowPage: React.FC = () => {
               {mandateTab === 'upi' && (
                 <div className="space-y-4 text-xs pt-2">
                   <div>
-                    <label className="block text-on-surface-variant font-semibold mb-1">Corporate UPI ID (VPA)</label>
+                    <label className="block text-on-surface-variant font-semibold mb-1">Corporate UPI ID (Optional)</label>
                     <input
                       type="text"
                       value={upiId}
                       onChange={(e) => setUpiId(e.target.value)}
                       placeholder="company@okhdfcbank"
-                      required
                       className="w-full bg-surface border border-outline-variant rounded-lg p-2.5 font-mono"
                     />
-                  </div>
-                  <div className="p-3.5 rounded-lg bg-surface-container-low text-[11px] text-on-surface-variant">
-                    An AutoPay mandate request will be delivered to your authorized UPI app. Approve within 10 minutes.
                   </div>
                 </div>
               )}
 
               {mandateTab === 'card' && (
-                <div className="space-y-4 text-xs pt-2">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-on-surface-variant font-semibold mb-1">Card Number</label>
-                      <input
-                        type="text"
-                        placeholder="4921 •••• •••• 8812"
-                        className="w-full bg-surface border border-outline-variant rounded-lg p-2.5 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-on-surface-variant font-semibold mb-1">Expiry / CVV</label>
-                      <input
-                        type="text"
-                        placeholder="MM/YY  CVV"
-                        className="w-full bg-surface border border-outline-variant rounded-lg p-2.5 font-mono"
-                      />
-                    </div>
-                  </div>
-                  <div className="p-3.5 rounded-lg bg-surface-container-low text-[11px] text-on-surface-variant">
-                    Supports Visa, MasterCard, and RuPay Corporate credit cards with recurring e-Mandate 2FA enrollment.
-                  </div>
+                <div className="p-3.5 rounded-lg bg-surface-container-low text-[11px] text-on-surface-variant">
+                  Supports Visa, MasterCard, and RuPay Corporate credit &amp; debit cards via Razorpay.
                 </div>
               )}
             </div>
@@ -321,8 +360,7 @@ export const SubscriptionWorkflowPage: React.FC = () => {
                   className="rounded border-outline-variant text-primary mt-0.5"
                 />
                 <span className="text-on-surface-variant leading-relaxed">
-                  I hereby authorize Brightloop Technologies Pvt Ltd to register an automated recurring e-Mandate with my
-                  bank for the scheduled subscription dues under the master enterprise agreement and Indian GST laws.
+                  I hereby authorize Brightloop Technologies to issue recurring invoices for this subscription contract according to Indian GST standards and the selected cadence.
                 </span>
               </label>
             </div>
@@ -336,44 +374,62 @@ export const SubscriptionWorkflowPage: React.FC = () => {
               <span className="material-symbols-outlined text-lg">verified_user</span>
               <span>
                 {isSubmitting
-                  ? 'Authorizing e-Mandate...'
-                  : `Authorize e-Mandate & Pay ₹${grandTotal.toLocaleString('en-IN')}`}
+                  ? 'Initializing Razorpay Checkout...'
+                  : `Confirm & Pay with Razorpay (${formatINR(grandTotal)})`}
               </span>
             </button>
           </form>
 
-          {/* RIGHT COLUMN: Sticky Order Summary & Compliance (cols 5) */}
+          {/* RIGHT COLUMN: Sticky Order Summary */}
           <div className="lg:col-span-5 space-y-5 lg:sticky lg:top-20">
-            {/* Subscription Breakdown Card */}
             <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-outline-variant">
                 <h3 className="text-base font-bold font-headline text-on-surface">Subscription Breakdown</h3>
                 <span className="text-[11px] font-mono text-outline">INR (₹)</span>
               </div>
 
-              {/* Items */}
+              {/* Product and Plan Selectors */}
               <div className="space-y-3 text-xs">
-                <div className="p-3 rounded-lg bg-surface-container-low space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-on-surface-variant uppercase">Select Tier</span>
-                    <span className="font-bold text-on-surface font-headline">
-                      ₹{basePrice.toLocaleString('en-IN')}
-                    </span>
-                  </div>
+                {/* Product Selection */}
+                <div className="p-3 rounded-lg bg-surface-container-low space-y-1.5">
+                  <label className="text-[11px] font-semibold text-on-surface-variant uppercase block">
+                    Product / Software Service
+                  </label>
                   <select
-                    value={selectedPlanCode}
-                    onChange={(e) => setSelectedPlanCode(e.target.value)}
+                    value={selectedProductId}
+                    onChange={(e) => setSelectedProductId(e.target.value)}
                     className="w-full bg-surface border border-outline-variant rounded-lg p-2 text-xs font-semibold text-on-surface focus:ring-1 focus:ring-primary"
                   >
-                    <option value="PLAN-ENT-Y">Enterprise Annual Platform (25 Seats • ₹2,40,000/yr)</option>
-                    <option value="PLAN-SCA-M">Scale Monthly Tier (15 Seats • ₹48,000/mo)</option>
-                    <option value="PLAN-GRO-M">Growth Monthly Tier (5 Seats • ₹18,000/mo)</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({formatINR(p.salesPrice)})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
+                {/* Plan Cadence Selection */}
+                <div className="p-3 rounded-lg bg-surface-container-low space-y-1.5">
+                  <label className="text-[11px] font-semibold text-on-surface-variant uppercase block">
+                    Recurring Cadence Plan
+                  </label>
+                  <select
+                    value={selectedPlanId}
+                    onChange={(e) => setSelectedPlanId(e.target.value)}
+                    className="w-full bg-surface border border-outline-variant rounded-lg p-2 text-xs font-semibold text-on-surface focus:ring-1 focus:ring-primary"
+                  >
+                    {plans.map((pl) => (
+                      <option key={pl.id} value={pl.id}>
+                        {pl.name} ({pl.billingFrequency})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Extra Seats */}
                 <div className="p-3 rounded-lg bg-surface-container-low flex items-center justify-between">
                   <div>
-                    <div className="font-bold text-on-surface">Extra Collaboration Licenses</div>
+                    <div className="font-bold text-on-surface">Additional User Licenses</div>
                     <div className="flex items-center gap-2 mt-1">
                       <button
                         type="button"
@@ -382,7 +438,7 @@ export const SubscriptionWorkflowPage: React.FC = () => {
                       >
                         -
                       </button>
-                      <span className="font-mono font-bold text-primary">{extraSeats} seats</span>
+                      <span className="font-mono font-bold text-primary">{extraSeats} extra seats</span>
                       <button
                         type="button"
                         onClick={() => setExtraSeats((s) => s + 1)}
@@ -393,7 +449,7 @@ export const SubscriptionWorkflowPage: React.FC = () => {
                     </div>
                   </div>
                   <span className="font-bold text-on-surface font-headline">
-                    ₹{addonsTotal.toLocaleString('en-IN')}
+                    {formatINR(addonsTotal)}
                   </span>
                 </div>
               </div>
@@ -426,14 +482,14 @@ export const SubscriptionWorkflowPage: React.FC = () => {
               {/* Calculations */}
               <div className="pt-3 border-t border-outline-variant space-y-2 text-xs">
                 <div className="flex justify-between text-on-surface-variant">
-                  <span>Subtotal:</span>
-                  <span className="font-medium text-on-surface">₹{subtotalBeforeDiscount.toLocaleString('en-IN')}</span>
+                  <span>Product Rate:</span>
+                  <span className="font-medium text-on-surface">{formatINR(subtotalBeforeDiscount)}</span>
                 </div>
 
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-emerald-700 font-semibold">
                     <span>Discount ({discountPct}%):</span>
-                    <span>-₹{discountAmount.toLocaleString('en-IN')}</span>
+                    <span>-{formatINR(discountAmount)}</span>
                   </div>
                 )}
 
@@ -441,31 +497,31 @@ export const SubscriptionWorkflowPage: React.FC = () => {
                   <>
                     <div className="flex justify-between text-on-surface-variant">
                       <span>CGST (9.0%):</span>
-                      <span className="font-medium text-on-surface">₹{cgst.toLocaleString('en-IN')}</span>
+                      <span className="font-medium text-on-surface">{formatINR(cgst)}</span>
                     </div>
                     <div className="flex justify-between text-on-surface-variant">
                       <span>SGST (9.0%):</span>
-                      <span className="font-medium text-on-surface">₹{sgst.toLocaleString('en-IN')}</span>
+                      <span className="font-medium text-on-surface">{formatINR(sgst)}</span>
                     </div>
                   </>
                 ) : (
                   <div className="flex justify-between text-on-surface-variant">
                     <span>IGST (18.0%):</span>
-                    <span className="font-medium text-on-surface">₹{igst.toLocaleString('en-IN')}</span>
+                    <span className="font-medium text-on-surface">{formatINR(igst)}</span>
                   </div>
                 )}
 
                 <div className="pt-3 border-t border-outline-variant flex items-baseline justify-between">
                   <div>
                     <span className="text-xs font-bold uppercase tracking-wider text-on-surface">
-                      Total Due Today
+                      Total Due
                     </span>
                     <p className="text-[10px] text-outline">
-                      Next auto-renewal scheduled: {isYearly ? 'Oct 14, 2027' : 'Next month'}
+                      Cadence: {activePlan?.billingFrequency || 'MONTHLY'}
                     </p>
                   </div>
                   <span className="text-2xl font-black text-primary tracking-tight font-headline">
-                    ₹{grandTotal.toLocaleString('en-IN')}
+                    {formatINR(grandTotal)}
                   </span>
                 </div>
               </div>
@@ -479,11 +535,7 @@ export const SubscriptionWorkflowPage: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-emerald-700 text-base">security</span>
-                <span>Reserve Bank of India e-Mandate Framework compliant</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-emerald-700 text-base">support</span>
-                <span>Immediate license provisioning upon authorization</span>
+                <span>Razorpay 256-bit encrypted payment gateway</span>
               </div>
             </div>
           </div>

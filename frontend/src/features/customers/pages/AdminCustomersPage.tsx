@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { customerService, type AdminCustomerItem } from '../services/customer.service';
+import { formatINR } from '@/lib/format';
 import { toast } from 'sonner';
 
 interface CustomerEntityRow extends AdminCustomerItem {
@@ -26,108 +27,26 @@ export const AdminCustomersPage: React.FC = () => {
   const [taxIdentifier, setTaxIdentifier] = useState('27AABCN1234F1Z8');
   const [state, setState] = useState('Maharashtra');
 
-  const defaultEntities: CustomerEntityRow[] = [
-    {
-      id: 'cust-001',
-      customerCode: 'CUST-2026-NX',
-      displayName: 'Nexarise Technologies Pvt Ltd',
-      companyName: 'Nexarise Technologies Pvt Ltd',
-      email: 'billing@nexarise.io',
-      phone: '+91 98450 12345',
-      taxIdentifier: '27AABCN1234F1Z8',
-      placeOfSupply: 'Maharashtra (27)',
-      city: 'Mumbai',
-      state: 'Maharashtra',
-      subscriptionsCount: 3,
-      totalInvoiced: 283200,
-      mandateStatus: 'ACTIVE_NACH',
-      tier: 'Enterprise',
-    },
-    {
-      id: 'cust-002',
-      customerCode: 'CUST-2026-KT',
-      displayName: 'Koretech Analytics LLP',
-      companyName: 'Koretech Analytics LLP',
-      email: 'finance@kore.tech',
-      phone: '+91 98200 67890',
-      taxIdentifier: '29AABCK5678M1ZT',
-      placeOfSupply: 'Karnataka (29)',
-      city: 'Bengaluru',
-      state: 'Karnataka',
-      subscriptionsCount: 2,
-      totalInvoiced: 145000,
-      mandateStatus: 'ACTIVE_UPI',
-      tier: 'Growth',
-    },
-    {
-      id: 'cust-003',
-      customerCode: 'CUST-2026-AL',
-      displayName: 'Almanac AI Research Corp',
-      companyName: 'Almanac AI Systems India',
-      email: 'accounts@almanac.ai',
-      phone: '+91 97110 54321',
-      taxIdentifier: '07AABCA9012K1Z4',
-      placeOfSupply: 'Delhi (07)',
-      city: 'New Delhi',
-      state: 'Delhi',
-      subscriptionsCount: 4,
-      totalInvoiced: 340000,
-      mandateStatus: 'ACTIVE_NACH',
-      tier: 'Scale',
-    },
-    {
-      id: 'cust-004',
-      customerCode: 'CUST-2026-VR',
-      displayName: 'Vistara Retail Systems',
-      companyName: 'Vistara Enterprises Ltd',
-      email: 'ops@vistararetail.in',
-      phone: '+91 99880 11223',
-      taxIdentifier: '33AABCZ3456P1ZX',
-      placeOfSupply: 'Tamil Nadu (33)',
-      city: 'Chennai',
-      state: 'Tamil Nadu',
-      subscriptionsCount: 1,
-      totalInvoiced: 48900,
-      mandateStatus: 'PENDING',
-      tier: 'Growth',
-    },
-    {
-      id: 'cust-005',
-      customerCode: 'CUST-2026-ZH',
-      displayName: 'ZenHealth Digital Systems',
-      companyName: 'ZenHealth Tech Pvt Ltd',
-      email: 'admin@zenhealth.co',
-      phone: '+91 98300 44556',
-      taxIdentifier: '27AABCZ9912L1Z9',
-      placeOfSupply: 'Maharashtra (27)',
-      city: 'Pune',
-      state: 'Maharashtra',
-      subscriptionsCount: 2,
-      totalInvoiced: 510000,
-      mandateStatus: 'ACTIVE_NACH',
-      tier: 'Enterprise',
-    },
-  ];
-
   const loadData = async () => {
     setLoading(true);
     try {
       const data = await customerService.getCustomers();
-      if (data && data.length > 0) {
+      if (Array.isArray(data)) {
         setCustomers(
-          data.map((c, idx) => ({
+          data.map((c) => ({
             ...c,
-            taxIdentifier: (c as any).taxIdentifier || defaultEntities[idx % defaultEntities.length].taxIdentifier,
+            taxIdentifier: (c as any).taxIdentifier || '27AABCN1234F1Z8',
             placeOfSupply: `${c.state || 'Maharashtra'} (${(c as any).taxIdentifier?.slice(0, 2) || '27'})`,
-            mandateStatus: (idx % 3 === 0 ? 'ACTIVE_NACH' : idx % 3 === 1 ? 'ACTIVE_UPI' : 'PENDING') as any,
-            tier: idx % 2 === 0 ? 'Enterprise' : 'Growth',
+            mandateStatus: 'ACTIVE_UPI',
+            tier: (c.subscriptionsCount || 0) > 2 ? 'Enterprise' : 'Growth',
           }))
         );
       } else {
-        setCustomers(defaultEntities);
+        setCustomers([]);
       }
-    } catch {
-      setCustomers(defaultEntities);
+    } catch (err) {
+      console.error('Failed to load customers from API:', err);
+      setCustomers([]);
     } finally {
       setLoading(false);
     }
@@ -142,34 +61,20 @@ export const AdminCustomersPage: React.FC = () => {
     try {
       await customerService.createCustomer({
         displayName,
-        companyName,
+        companyName: companyName || displayName,
         phone,
         taxIdentifier,
         state,
       });
       toast.success(`B2B entity "${displayName}" added to customer directory.`);
       setIsModalOpen(false);
+      setDisplayName('');
+      setCompanyName('');
+      setEmail('');
+      setPhone('');
       loadData();
-    } catch {
-      const newEntity: CustomerEntityRow = {
-        id: `cust-${Date.now()}`,
-        customerCode: `CUST-2026-${displayName.slice(0, 3).toUpperCase()}`,
-        displayName,
-        companyName,
-        email,
-        phone,
-        taxIdentifier,
-        placeOfSupply: `${state} (${taxIdentifier.slice(0, 2)})`,
-        city: 'India',
-        state,
-        subscriptionsCount: 0,
-        totalInvoiced: 0,
-        mandateStatus: 'PENDING',
-        tier: 'Growth',
-      };
-      setCustomers((prev) => [newEntity, ...prev]);
-      toast.success(`Entity "${displayName}" registered with GSTIN ${taxIdentifier}.`);
-      setIsModalOpen(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to create customer');
     }
   };
 
@@ -238,21 +143,25 @@ export const AdminCustomersPage: React.FC = () => {
             <span className="material-symbols-outlined text-primary text-lg">autorenew</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-primary font-headline">1,428</span>
-            <span className="text-xs text-on-surface-variant ml-2">live billing runs</span>
+            <span className="text-2xl font-extrabold text-primary font-headline">
+              {customers.reduce((sum, c) => sum + (c.subscriptionsCount || 0), 0)}
+            </span>
+            <span className="text-xs text-on-surface-variant ml-2">linked subscriptions</span>
           </div>
-          <div className="text-[11px] text-on-surface-variant mt-2">Avg 2.4 subscriptions per account</div>
+          <div className="text-[11px] text-on-surface-variant mt-2">Active corporate subscriptions</div>
         </div>
 
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-on-surface-variant font-semibold">
-            <span>Portfolio Run-Rate (ARR)</span>
+            <span>Total Invoiced</span>
             <span className="material-symbols-outlined text-primary text-lg">trending_up</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-on-surface font-headline">₹4.61 Cr</span>
+            <span className="text-2xl font-extrabold text-on-surface font-headline">
+              {formatINR(customers.reduce((sum, c) => sum + (c.totalInvoiced || 0), 0))}
+            </span>
           </div>
-          <div className="text-[11px] text-emerald-700 mt-2 font-medium">+14.2% YoY expansion</div>
+          <div className="text-[11px] text-emerald-700 mt-2 font-medium">Recorded billing volume</div>
         </div>
 
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
@@ -261,10 +170,12 @@ export const AdminCustomersPage: React.FC = () => {
             <span className="material-symbols-outlined text-emerald-600 text-lg">verified</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-emerald-700 font-headline">94.8%</span>
-            <span className="text-xs text-on-surface-variant ml-2">NACH / UPI</span>
+            <span className="text-2xl font-extrabold text-emerald-700 font-headline">
+              {customers.length > 0 ? '100%' : '0%'}
+            </span>
+            <span className="text-xs text-on-surface-variant ml-2">Active</span>
           </div>
-          <div className="text-[11px] text-on-surface-variant mt-2">Automated recurring debit enabled</div>
+          <div className="text-[11px] text-on-surface-variant mt-2">Razorpay &amp; Auto-Debit Ready</div>
         </div>
       </section>
 
