@@ -12,6 +12,7 @@ import {
   LoginInput,
   CreateStaffInput,
 } from "./auth.validation";
+import { EmailService } from "../../services/email.service";
 
 export class AuthService {
   /**
@@ -166,11 +167,12 @@ export class AuthService {
   }
 
   /**
-   * Initiate password reset flow.
+   * Initiate password reset flow and deliver reset email via Nodemailer.
    */
   static async forgotPassword(email: string) {
     const user = await prisma.user.findUnique({
       where: { email },
+      include: { customerProfile: true },
     });
 
     if (!user) {
@@ -193,11 +195,16 @@ export class AuthService {
       },
     });
 
-    // In a hackathon demo, we log the reset link and return the token for testing
-    console.log(`[RESET PASSWORD LINK]: /reset-password/${rawToken} for ${email}`);
+    // Send reset email via Nodemailer
+    await EmailService.sendPasswordResetEmail({
+      to: user.email,
+      resetToken: rawToken,
+      userDisplayName:
+        user.customerProfile?.displayName || user.email.split("@")[0],
+    });
 
     return {
-      message: "If that email is registered, password reset instructions have been generated.",
+      message: "If that email is registered, password reset instructions have been sent.",
       // Include token in dev mode for easy test execution
       ...(process.env.NODE_ENV !== "production" && { devResetToken: rawToken }),
     };
