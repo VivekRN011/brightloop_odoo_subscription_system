@@ -65,11 +65,6 @@ PORT=5000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 
-# Neon Pooled Connection (Used at application runtime)
-DATABASE_URL="postgresql://neondb_owner:npg_2rjMWoGZyU4F@ep-delicate-firefly-b5q7o6aa-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require"
-
-# Neon Direct Connection (Used for Prisma migrations & schema push)
-DIRECT_URL="postgresql://neondb_owner:npg_2rjMWoGZyU4F@ep-delicate-firefly-b5q7o6aa.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require"
 
 # Authentication
 JWT_SECRET=brightloop_odoo_hackathon_super_secret_jwt_2026
