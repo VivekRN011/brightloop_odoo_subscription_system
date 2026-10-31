@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Settings,
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { useProducts } from '@/features/products/hooks/useProducts';
 import { usePlans } from '@/features/plans/hooks/usePlans';
 import { formatINR } from '@/lib/format';
@@ -18,8 +19,26 @@ import { Button } from '@/components/ui/button';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const { isAuthenticated, role } = useAuth();
   const { data: products = [], isLoading: productsLoading } = useProducts();
   const { data: plans = [], isLoading: plansLoading } = usePlans();
+
+  const handleStartSubscription = (productId?: string, planCode?: string) => {
+    if (isAuthenticated && role === 'CUSTOMER') {
+      const search = new URLSearchParams();
+      if (productId) search.set('product', productId);
+      if (planCode) search.set('plan', planCode);
+      const query = search.toString() ? `?${search.toString()}` : '';
+      navigate(`/portal/catalog${query}`);
+    } else {
+      const target = productId
+        ? `/portal/catalog?product=${productId}`
+        : planCode
+        ? `/portal/catalog?plan=${planCode}`
+        : '/portal/catalog';
+      navigate(`/login?redirect=${encodeURIComponent(target)}`);
+    }
+  };
 
   return (
     <div className="space-y-20 pb-20 overflow-hidden">
@@ -57,10 +76,10 @@ export const HomePage: React.FC = () => {
             <Button
               size="lg"
               variant="outline"
-              onClick={() => navigate('/subscribe')}
+              onClick={() => handleStartSubscription()}
               className="w-full sm:w-auto font-semibold text-sm px-6 h-11 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200"
             >
-              Configure Subscription
+              {isAuthenticated && role === 'CUSTOMER' ? 'Open Customer Workspace' : 'Configure Subscription'}
             </Button>
           </div>
 
@@ -227,7 +246,7 @@ export const HomePage: React.FC = () => {
                       </Button>
                       <Button
                         size="sm"
-                        onClick={() => navigate(`/subscribe?product=${product.id}`)}
+                        onClick={() => handleStartSubscription(product.id)}
                         className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
                       >
                         Subscribe
@@ -321,7 +340,7 @@ export const HomePage: React.FC = () => {
 
                 <div className="pt-6 mt-4">
                   <Button
-                    onClick={() => navigate(`/subscribe?plan=${plan.code}`)}
+                    onClick={() => handleStartSubscription(undefined, plan.code)}
                     className={`w-full text-xs font-semibold ${
                       plan.popular
                         ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs'

@@ -11,6 +11,7 @@ import {
   ArrowRight,
   ShieldCheck,
   AlertCircle,
+  CheckCircle2,
   Repeat,
   Receipt,
   CreditCard,
@@ -20,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { loginSchema, type LoginFormData } from '../schemas/auth.schemas';
 import { DEMO_USERS } from '../services/auth.service';
 import { Button } from '@/components/ui/button';
+import { api } from '@/services/api';
 
 export const LoginPage: React.FC = () => {
   const { login, isAuthenticated, role } = useAuth();
@@ -28,7 +30,16 @@ export const LoginPage: React.FC = () => {
 
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [resetNotice, setResetNotice] = useState(false);
+
+  // Forgot password interactive state
+  const [forgotModalOpen, setForgotModalOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotStatus, setForgotStatus] = useState<{
+    success: boolean;
+    message: string;
+    resetToken?: string;
+  } | null>(null);
 
   // If already authenticated, redirect to appropriate destination
   React.useEffect(() => {
@@ -45,6 +56,7 @@ export const LoginPage: React.FC = () => {
     register,
     handleSubmit,
     setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -60,7 +72,6 @@ export const LoginPage: React.FC = () => {
       setFormError(null);
       const user = await login(data);
 
-      // Check destination from state or redirect according to authenticated role
       const fromPath = (location.state as { from?: string } | null)?.from;
       if (fromPath && !fromPath.startsWith('/login')) {
         navigate(fromPath, { replace: true });
@@ -87,6 +98,29 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  const handleSendResetEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) return;
+
+    setForgotLoading(true);
+    setForgotStatus(null);
+    try {
+      const res = await api.post('/auth/forgot-password', { email: forgotEmail });
+      setForgotStatus({
+        success: true,
+        message: res.data?.message || 'Password reset email sent!',
+        resetToken: res.data?.data?.devResetToken,
+      });
+    } catch (err: any) {
+      setForgotStatus({
+        success: false,
+        message: err.response?.data?.message || 'Failed to dispatch reset email.',
+      });
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   return (
     <div className="login-page">
       {/* Left Column: Sign In Form */}
@@ -98,40 +132,103 @@ export const LoginPage: React.FC = () => {
               <Zap size={22} className="fill-white" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-slate-100">
-                  Brightloop
-                </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  Sign In
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Subscription & Recurring Billing Management
-              </p>
+              <span className="font-bold text-lg text-slate-900 dark:text-slate-100 tracking-tight">
+                Brightloop
+              </span>
+              <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+                Subscription Management
+              </span>
             </div>
           </div>
 
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-1">
-            Sign in to your account
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
-            Enter your credentials to access your administrative workspace or customer portal.
-          </p>
+          <div className="mb-6">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              Welcome back
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Enter your credentials to access your Brightloop workspace.
+            </p>
+          </div>
 
-          {/* Error Alert */}
+          {/* Form Error Alert */}
           {formError && (
-            <div
-              role="alert"
-              className="mb-5 p-3 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2.5"
-            >
-              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <div className="p-3 mb-4 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
+              <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <span>{formError}</span>
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          {/* Interactive Forgot Password Box */}
+          {forgotModalOpen && (
+            <div className="p-4 mb-5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 text-xs shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                  <Mail size={15} className="text-indigo-600" />
+                  Reset Password via Nodemailer
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setForgotModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 text-xs px-1"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 mb-3">
+                Enter your account email. We will send a secure password reset link to your inbox.
+              </p>
+              <form onSubmit={handleSendResetEmail} className="space-y-2">
+                <input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder="Enter your registered email"
+                  required
+                  className="w-full h-9 px-3 rounded-lg border border-indigo-200 dark:border-indigo-800 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <Button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
+                >
+                  {forgotLoading ? 'Dispatching via Nodemailer...' : 'Send Reset Link'}
+                </Button>
+              </form>
+
+              {forgotStatus && (
+                <div
+                  className={`mt-3 p-2.5 rounded-lg text-[11px] ${
+                    forgotStatus.success
+                      ? 'bg-emerald-100/80 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                      : 'bg-rose-100/80 text-rose-900 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300'
+                  }`}
+                >
+                  <div className="flex items-start gap-1.5">
+                    {forgotStatus.success ? (
+                      <CheckCircle2 size={14} className="shrink-0 mt-0.5 text-emerald-600" />
+                    ) : (
+                      <AlertCircle size={14} className="shrink-0 mt-0.5 text-rose-600" />
+                    )}
+                    <span>{forgotStatus.message}</span>
+                  </div>
+
+                  {forgotStatus.resetToken && (
+                    <div className="mt-2 pt-2 border-t border-emerald-300/60 dark:border-emerald-800/60">
+                      <Link
+                        to={`/reset-password/${forgotStatus.resetToken}`}
+                        className="font-bold underline text-emerald-950 dark:text-emerald-200 flex items-center gap-1"
+                      >
+                        👉 Open Password Reset Page now
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Email Field */}
             <div>
               <label
                 htmlFor="email"
@@ -148,7 +245,7 @@ export const LoginPage: React.FC = () => {
                   id="email"
                   type="email"
                   autoComplete="email"
-                  placeholder="name@company.com"
+                  placeholder="admin@brightloop.io"
                   {...register('email')}
                   className={`w-full h-10 pl-9 pr-3 rounded-lg border text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 ${
                     errors.email
@@ -164,6 +261,7 @@ export const LoginPage: React.FC = () => {
               )}
             </div>
 
+            {/* Password Field */}
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label
@@ -174,7 +272,12 @@ export const LoginPage: React.FC = () => {
                 </label>
                 <button
                   type="button"
-                  onClick={() => setResetNotice(true)}
+                  onClick={() => {
+                    const currentEmail = getValues('email');
+                    setForgotEmail(currentEmail || '');
+                    setForgotStatus(null);
+                    setForgotModalOpen(true);
+                  }}
                   className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
                 >
                   Forgot password?
@@ -212,12 +315,6 @@ export const LoginPage: React.FC = () => {
                 </p>
               )}
             </div>
-
-            {resetNotice && (
-              <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-[11px] text-amber-800 dark:text-amber-300">
-                Password reset link dispatch is configured via Nodemailer. For demonstration, click any of the role cards below to pre-fill credentials.
-              </div>
-            )}
 
             <div className="flex items-center justify-between text-xs pt-1">
               <label className="flex items-center gap-2 cursor-pointer text-slate-600 dark:text-slate-400">
@@ -262,7 +359,7 @@ export const LoginPage: React.FC = () => {
                 className="login-demo__btn"
               >
                 <span className="login-demo__role">Admin</span>
-                <span className="login-demo__email">alex.morgan</span>
+                <span className="login-demo__email">admin@brightloop</span>
               </button>
               <button
                 type="button"
@@ -270,7 +367,7 @@ export const LoginPage: React.FC = () => {
                 className="login-demo__btn"
               >
                 <span className="login-demo__role">Staff</span>
-                <span className="login-demo__email">staff.member</span>
+                <span className="login-demo__email">staff@brightloop</span>
               </button>
               <button
                 type="button"
@@ -278,7 +375,7 @@ export const LoginPage: React.FC = () => {
                 className="login-demo__btn"
               >
                 <span className="login-demo__role">Customer</span>
-                <span className="login-demo__email">billing@apex</span>
+                <span className="login-demo__email">sarah.chen</span>
               </button>
             </div>
           </div>
@@ -376,4 +473,3 @@ export const LoginPage: React.FC = () => {
     </div>
   );
 };
-

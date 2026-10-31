@@ -8,13 +8,24 @@ import {
   Package,
 } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
+import { useAuth } from '@/context/AuthContext';
 import { formatINR } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/EmptyState';
 
 export const ProductListPage: React.FC = () => {
   const navigate = useNavigate();
+  const { isAuthenticated, role } = useAuth();
   const { data: products = [], isLoading } = useProducts();
+
+  const handleSubscribeClick = (productId?: string) => {
+    if (isAuthenticated && role === 'CUSTOMER') {
+      navigate(productId ? `/portal/catalog?product=${productId}` : '/portal/catalog');
+    } else {
+      const redirectUrl = productId ? `/portal/catalog?product=${productId}` : '/portal/catalog';
+      navigate(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
+    }
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('ALL');
@@ -62,10 +73,10 @@ export const ProductListPage: React.FC = () => {
           </div>
 
           <Button
-            onClick={() => navigate('/subscribe')}
+            onClick={() => handleSubscribeClick()}
             className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold self-start sm:self-auto flex items-center gap-1.5 shadow-xs"
           >
-            <span>Plan Configurator</span>
+            <span>{isAuthenticated && role === 'CUSTOMER' ? 'Open Customer Catalog' : 'Plan Configurator'}</span>
             <ArrowRight size={14} />
           </Button>
         </div>
@@ -232,7 +243,7 @@ export const ProductListPage: React.FC = () => {
                     </Button>
                     <Button
                       size="sm"
-                      onClick={() => navigate(`/subscribe?product=${product.id}`)}
+                      onClick={() => handleSubscribeClick(product.id)}
                       className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
                     >
                       Subscribe

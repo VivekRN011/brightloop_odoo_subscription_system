@@ -11,12 +11,14 @@ import {
 } from 'lucide-react';
 import { useProduct } from '../hooks/useProducts';
 import { usePlans } from '@/features/plans/hooks/usePlans';
+import { useAuth } from '@/context/AuthContext';
 import { formatINR } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 
 export const ProductDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated, role } = useAuth();
   const { data: product, isLoading, isError } = useProduct(id);
   const { data: plans = [] } = usePlans();
 
@@ -300,11 +302,16 @@ export const ProductDetailsPage: React.FC = () => {
               onClick={() => {
                 const variantQuery = selectedVariantId ? `&variant=${selectedVariantId}` : '';
                 const planQuery = selectedPlanCode ? `&plan=${selectedPlanCode}` : '';
-                navigate(`/subscribe?product=${product.id}${variantQuery}${planQuery}`);
+                const target = `/portal/catalog?product=${product.id}${variantQuery}${planQuery}`;
+                if (isAuthenticated && role === 'CUSTOMER') {
+                  navigate(target);
+                } else {
+                  navigate(`/login?redirect=${encodeURIComponent(target)}`);
+                }
               }}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-11 flex items-center justify-center gap-1.5 shadow-xs"
             >
-              <span>Continue to Subscription Setup</span>
+              <span>{isAuthenticated && role === 'CUSTOMER' ? 'Configure in Customer Workspace' : 'Sign In to Subscribe'}</span>
               <ArrowRight size={14} />
             </Button>
 
