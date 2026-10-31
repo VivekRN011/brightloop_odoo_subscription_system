@@ -5,9 +5,9 @@ import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { LoginPage, RegisterPage } from '@/features/auth';
 import { HomePage } from '@/features/public';
 import { ProductListPage, ProductDetailsPage } from '@/features/products';
-import { SubscriptionWorkflowPage } from '@/features/subscriptions';
 import {
   CustomerDashboardPage,
+  CustomerCatalogPage,
   CustomerSubscriptionsPage,
   CustomerSubscriptionDetailPage,
   CustomerInvoicesPage,
@@ -18,6 +18,7 @@ import {
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 import { NotFoundPage } from './NotFoundPage';
 import { PortalLayout } from '@/features/portal/PortalLayout';
+import { SubscribeRouteGuard } from './SubscribeRouteGuard';
 
 export const router = createBrowserRouter([
   {
@@ -38,11 +39,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'subscribe',
-        element: <SubscriptionWorkflowPage />,
+        element: <SubscribeRouteGuard />,
       },
       {
         path: 'subscribe/:productId',
-        element: <SubscriptionWorkflowPage />,
+        element: <SubscribeRouteGuard />,
       },
     ],
   },
@@ -61,6 +62,10 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <CustomerDashboardPage />,
+      },
+      {
+        path: 'catalog',
+        element: <CustomerCatalogPage />,
       },
       {
         path: 'subscriptions',

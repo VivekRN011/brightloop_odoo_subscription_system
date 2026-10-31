@@ -20,11 +20,18 @@ export const PublicLayout: React.FC = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const navLinks = [
-    { label: 'Home', to: '/' },
-    { label: 'Products & Services', to: '/products' },
-    { label: 'Configure Subscription', to: '/subscribe' },
-  ];
+  const navLinks = isAuthenticated && role === 'CUSTOMER'
+    ? [
+        { label: 'Home', to: '/' },
+        { label: 'Public Catalog', to: '/products' },
+        { label: 'Customer Portal', to: '/portal' },
+        { label: 'Services & Subscriptions', to: '/portal/catalog' },
+      ]
+    : [
+        { label: 'Home', to: '/' },
+        { label: 'Products & Services', to: '/products' },
+        { label: 'Pricing & Plans', to: '/#plans' },
+      ];
 
   return (
     <div className="min-h-screen bg-slate-50/60 dark:bg-[#0c0e14] text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-indigo-500/20 selection:text-indigo-600">
@@ -34,13 +41,23 @@ export const PublicLayout: React.FC = () => {
         <span>
           Odoo x Make-A-Ton 9.0 Hackathon • Explore Brightloop Recurring Billing &amp; Self-Service
         </span>
-        <Link
-          to="/subscribe"
-          className="hidden sm:inline-flex items-center gap-1 underline underline-offset-2 hover:text-white/90 font-semibold text-[11px] ml-2"
-        >
-          <span>Try Plan Builder</span>
-          <ArrowRight size={12} />
-        </Link>
+        {isAuthenticated && role === 'CUSTOMER' ? (
+          <Link
+            to="/portal"
+            className="hidden sm:inline-flex items-center gap-1 underline underline-offset-2 hover:text-white/90 font-semibold text-[11px] ml-2"
+          >
+            <span>My Subscriber Workspace</span>
+            <ArrowRight size={12} />
+          </Link>
+        ) : (
+          <Link
+            to="/login?redirect=/portal/catalog"
+            className="hidden sm:inline-flex items-center gap-1 underline underline-offset-2 hover:text-white/90 font-semibold text-[11px] ml-2"
+          >
+            <span>Sign In to Subscribe</span>
+            <ArrowRight size={12} />
+          </Link>
+        )}
       </div>
 
       {/* Main Public Header */}
@@ -316,8 +333,8 @@ export const PublicLayout: React.FC = () => {
                   </Link>
                 </li>
                 <li>
-                  <Link to="/subscribe" className="hover:text-indigo-600 transition-colors">
-                    Configure New Plan
+                  <Link to="/portal/catalog" className="hover:text-indigo-600 transition-colors">
+                    Services &amp; Subscription Setup
                   </Link>
                 </li>
               </ul>
