@@ -14,6 +14,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   icon,
   colorVar = '#4f6ef7',
 }) => {
+  if (!metric) return null;
   const trendUp = (metric.changePct ?? 0) > 0;
   const trendDown = (metric.changePct ?? 0) < 0;
   const TrendIcon = trendUp ? TrendingUp : trendDown ? TrendingDown : Minus;
