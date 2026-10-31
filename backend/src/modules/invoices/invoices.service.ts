@@ -158,7 +158,13 @@ export class InvoicesService {
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
-        customer: true,
+        customer: {
+          include: {
+            user: {
+              select: { email: true },
+            },
+          },
+        },
         subscription: true,
         lines: {
           include: {
@@ -289,7 +295,13 @@ export class InvoicesService {
     const subscription = await prisma.subscription.findUnique({
       where: { id: subscriptionId },
       include: {
-        customer: true,
+        customer: {
+          include: {
+            user: {
+              select: { email: true },
+            },
+          },
+        },
         plan: true,
         lines: {
           include: {
@@ -557,7 +569,13 @@ export class InvoicesService {
           confirmedAt: new Date(),
         },
         include: {
-          customer: true,
+          customer: {
+          include: {
+            user: {
+              select: { email: true },
+            },
+          },
+        },
           lines: true,
         },
       });
@@ -611,7 +629,13 @@ export class InvoicesService {
             : invoice.notes,
         },
         include: {
-          customer: true,
+          customer: {
+          include: {
+            user: {
+              select: { email: true },
+            },
+          },
+        },
           lines: true,
         },
       });

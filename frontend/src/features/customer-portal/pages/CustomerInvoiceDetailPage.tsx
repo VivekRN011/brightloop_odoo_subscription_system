@@ -15,6 +15,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { formatINR, formatDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { launchRazorpayCheckout } from '../services/razorpayClient.service';
+import { api } from '@/services/api';
 
 export const CustomerInvoiceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -68,6 +69,26 @@ export const CustomerInvoiceDetailPage: React.FC = () => {
       </div>
     );
   }
+
+  const handleDownloadPdf = async () => {
+    if (!invoice) return;
+    try {
+      const response = await api.get(`/invoices/${invoice.id}/pdf`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Invoice-${invoice.invoiceNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch {
+      window.open(`${api.defaults.baseURL}/invoices/${invoice.id}/pdf`, '_blank');
+    }
+  };
 
   const handleStartRazorpayCheckout = async () => {
     if (!invoice) return;
@@ -139,7 +160,7 @@ export const CustomerInvoiceDetailPage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => alert(`Downloading Tax Invoice ${invoice.invoiceNumber} (PDF)`)}
+              onClick={handleDownloadPdf}
               className="text-xs flex items-center gap-1.5"
             >
               <Download size={13} />

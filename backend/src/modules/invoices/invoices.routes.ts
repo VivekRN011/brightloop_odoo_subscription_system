@@ -23,12 +23,29 @@ router.get(
   InvoicesController.getOverdue
 );
 
+// Staff/Admin: List past automated billing runs
+router.get(
+  "/billing-runs",
+  requireRole(UserRole.ADMIN, UserRole.STAFF),
+  InvoicesController.listBillingRuns
+);
+
+// Staff/Admin: Trigger manual/immediate billing run batch
+router.post(
+  "/run-billing",
+  requireRole(UserRole.ADMIN, UserRole.STAFF),
+  InvoicesController.triggerBillingRun
+);
+
 // List invoices (Admin, Staff, or Customer scoped to own invoices)
 router.get(
   "/",
   validate({ query: invoiceQuerySchema }),
   InvoicesController.list
 );
+
+// Stream branded GST Tax Invoice PDF (Admin, Staff, or owning Customer)
+router.get("/:id/pdf", InvoicesController.streamPdf);
 
 // Get single invoice by ID (Admin, Staff, or Customer scoped to own invoices)
 router.get("/:id", InvoicesController.getById);
