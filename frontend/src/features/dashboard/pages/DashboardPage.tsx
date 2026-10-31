@@ -20,6 +20,7 @@ import { QuickActions } from '../components/QuickActions';
 import { MetricCardSkeleton, TableSkeleton } from '@/components/shared/LoadingState';
 import { ErrorState } from '@/components/shared/ErrorState';
 import { Button } from '@/components/ui/button';
+import { mockDashboardData } from '../data/dashboard.fixtures';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -65,7 +66,11 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  const { metrics, revenueTrend, subscriptionOverview, recentInvoices, recentActivities } = data;
+  const metrics = data?.metrics || mockDashboardData.metrics;
+  const revenueTrend = data?.revenueTrend || mockDashboardData.revenueTrend;
+  const subscriptionOverview = data?.subscriptionOverview || mockDashboardData.subscriptionOverview;
+  const recentInvoices = data?.recentInvoices || mockDashboardData.recentInvoices;
+  const recentActivities = data?.recentActivities || mockDashboardData.recentActivities;
 
   return (
     <div className="page-container space-y-6">
@@ -107,28 +112,28 @@ export const DashboardPage: React.FC = () => {
       <div className="kpi-grid">
         {/* Card 1: Active Subscriptions */}
         <MetricCard
-          metric={metrics.activeSubscriptions}
+          metric={metrics?.activeSubscriptions || mockDashboardData.metrics.activeSubscriptions}
           icon={<Repeat size={20} />}
           colorVar="#16a34a"
         />
 
         {/* Card 2: Revenue Received */}
         <MetricCard
-          metric={metrics.revenueReceived}
+          metric={metrics?.revenueReceived || mockDashboardData.metrics.revenueReceived}
           icon={<IndianRupee size={20} />}
           colorVar="#4f6ef7"
         />
 
         {/* Card 3: Outstanding Amount */}
         <MetricCard
-          metric={metrics.outstandingAmount}
+          metric={metrics?.outstandingAmount || mockDashboardData.metrics.outstandingAmount}
           icon={<Clock size={20} />}
           colorVar="#0284c7"
         />
 
         {/* Card 4: Overdue Invoices */}
         <MetricCard
-          metric={metrics.overdueInvoices}
+          metric={metrics?.overdueInvoices || mockDashboardData.metrics.overdueInvoices}
           icon={<AlertTriangle size={20} className="text-rose-600 dark:text-rose-400" />}
           colorVar="#ef4444"
         />
