@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Receipt,
   ChevronRight,
@@ -9,12 +10,14 @@ import {
   AlertTriangle,
   FileText,
   X,
+  Loader2,
 } from 'lucide-react';
 import type { CustomerInvoice } from '../models/customerPortal.types';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { formatINR, formatDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
+import { launchRazorpayCheckout } from '../services/razorpayClient.service';
 
 export interface CustomerInvoicesListProps {
   invoices: CustomerInvoice[];
@@ -25,27 +28,43 @@ export const CustomerInvoicesList: React.FC<CustomerInvoicesListProps> = ({
   invoices,
   showViewAll = true,
 }) => {
+  const queryClient = useQueryClient();
   const [selectedInvoice, setSelectedInvoice] = useState<CustomerInvoice | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [verifiedPaymentId, setVerifiedPaymentId] = useState<string | null>(null);
 
   const handleOpenPay = (inv: CustomerInvoice) => {
     setSelectedInvoice(inv);
     setPaymentSuccess(false);
+    setErrorMessage(null);
+    setVerifiedPaymentId(null);
   };
 
-  const handleSimulatePayment = () => {
+  const handleStartRazorpayCheckout = async () => {
+    if (!selectedInvoice) return;
+
     setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setPaymentSuccess(true);
-      if (selectedInvoice) {
-        selectedInvoice.status = 'paid';
-        selectedInvoice.paidAmount = selectedInvoice.totalAmount;
-        selectedInvoice.outstandingAmount = 0;
-        selectedInvoice.isOverdue = false;
-      }
-    }, 1200);
+    setErrorMessage(null);
+
+    await launchRazorpayCheckout({
+      invoiceId: selectedInvoice.id,
+      onSuccess: (result) => {
+        setIsProcessing(false);
+        setPaymentSuccess(true);
+        setVerifiedPaymentId(result.payment?.gatewayPaymentId || result.payment?.reference || 'Verified');
+        // Instantly invalidate query caches to refresh summary & invoices
+        queryClient.invalidateQueries({ queryKey: ['portal'] });
+      },
+      onError: (err) => {
+        setIsProcessing(false);
+        setErrorMessage(err);
+      },
+      onDismiss: () => {
+        setIsProcessing(false);
+      },
+    });
   };
 
   return (
@@ -215,20 +234,27 @@ export const CustomerInvoicesList: React.FC<CustomerInvoicesListProps> = ({
                     <CheckCircle2 size={32} />
                   </div>
                   <h4 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1">
-                    Payment Succeeded!
+                    Payment Verified &amp; Settled!
                   </h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mb-6">
-                    Transaction ID <span className="font-mono font-semibold">pay_test_09a47b19e</span> has been recorded. Your invoice status is now updated to Paid.
+                    Razorpay transaction <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{verifiedPaymentId}</span> has been cryptographically confirmed. Your invoice is now marked <strong className="text-emerald-600">PAID</strong>.
                   </p>
                   <Button
                     onClick={() => setSelectedInvoice(null)}
                     className="w-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 text-xs font-semibold"
                   >
-                    Close Window
+                    Done
                   </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {errorMessage && (
+                    <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300 text-xs flex items-center gap-2">
+                      <AlertTriangle size={15} className="shrink-0" />
+                      <span>{errorMessage}</span>
+                    </div>
+                  )}
+
                   <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 space-y-2 text-xs">
                     <div className="flex justify-between text-slate-500 dark:text-slate-400">
                       <span>Invoice Number:</span>
@@ -252,37 +278,8 @@ export const CustomerInvoicesList: React.FC<CustomerInvoicesListProps> = ({
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Select Payment Method
-                    </p>
-                    <div className="grid grid-cols-3 gap-2 text-xs font-medium">
-                      <button
-                        type="button"
-                        className="py-2.5 px-3 rounded-lg border border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 flex flex-col items-center justify-center gap-1 transition-all"
-                      >
-                        <CreditCard size={15} />
-                        <span>UPI / Card</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="py-2.5 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 flex flex-col items-center justify-center gap-1 transition-all opacity-70"
-                        title="Net Banking"
-                      >
-                        <span>Net Banking</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="py-2.5 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 flex flex-col items-center justify-center gap-1 transition-all opacity-70"
-                        title="Corporate Wallet"
-                      >
-                        <span>Wallet</span>
-                      </button>
-                    </div>
-                  </div>
-
                   <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
-                    By confirming this test transaction, Brightloop simulates receipt generation and automatic reconciliation against your subscription account.
+                    Razorpay Test Mode is active. Orders are created server-side in paise and HMAC SHA-256 signatures are securely verified upon completion.
                   </p>
 
                   <div className="pt-2 flex gap-2">
@@ -295,11 +292,18 @@ export const CustomerInvoicesList: React.FC<CustomerInvoicesListProps> = ({
                       Cancel
                     </Button>
                     <Button
-                      onClick={handleSimulatePayment}
-                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
+                      onClick={handleStartRazorpayCheckout}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5"
                       disabled={isProcessing}
                     >
-                      {isProcessing ? 'Authorizing...' : `Pay ${formatINR(selectedInvoice.outstandingAmount)}`}
+                      {isProcessing ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin" />
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        <span>Pay {formatINR(selectedInvoice.outstandingAmount)}</span>
+                      )}
                     </Button>
                   </div>
                 </div>

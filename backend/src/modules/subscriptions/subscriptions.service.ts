@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma";
 import { generateSubscriptionNumber, generateInvoiceNumber } from "../../utils/code-generator";
+import { BillingCalculationService } from "../../services/billing-calculation.service";
 import {
   CreateSubscriptionInput,
   UpdateSubscriptionInput,
@@ -10,9 +11,36 @@ import {
   SubscriptionStatus,
   InvoiceStatus,
   BillingFrequency,
+  BillingAttemptStatus,
 } from "@prisma/client";
 
 export class SubscriptionsService {
+  /**
+   * Calendar-aware next billing date calculation that preserves month-end boundaries
+   */
+  static calculateNextBillingDate(baseDate: Date, frequency: BillingFrequency, intervalCount: number = 1): Date {
+    const next = new Date(baseDate);
+    if (frequency === BillingFrequency.DAILY) {
+      next.setDate(next.getDate() + intervalCount);
+    } else if (frequency === BillingFrequency.WEEKLY) {
+      next.setDate(next.getDate() + 7 * intervalCount);
+    } else if (frequency === BillingFrequency.MONTHLY) {
+      const originalDay = baseDate.getDate();
+      next.setMonth(next.getMonth() + intervalCount);
+      // If month wrapped (e.g. Jan 31 -> Feb 28), set to last day of target month
+      if (next.getDate() !== originalDay) {
+        next.setDate(0);
+      }
+    } else if (frequency === BillingFrequency.YEARLY) {
+      const originalMonth = baseDate.getMonth();
+      next.setFullYear(next.getFullYear() + intervalCount);
+      if (next.getMonth() !== originalMonth) {
+        next.setDate(0);
+      }
+    }
+    return next;
+  }
+
   static async listSubscriptions(query: SubscriptionQueryInput) {
     const { search, customerId, status, planId, page, limit } = query;
     const skip = (page - 1) * limit;
@@ -110,20 +138,50 @@ export class SubscriptionsService {
   }
 
   static async createSubscription(input: CreateSubscriptionInput, actorUserId: string) {
-    const subscriptionNumber = generateSubscriptionNumber();
     const startAt = input.startAt ? new Date(input.startAt) : new Date();
 
-    // Calculate next billing date based on frequency
-    const nextBillingAt = new Date(startAt);
-    if (input.billingFrequency === BillingFrequency.DAILY) {
-      nextBillingAt.setDate(nextBillingAt.getDate() + input.intervalCount);
-    } else if (input.billingFrequency === BillingFrequency.WEEKLY) {
-      nextBillingAt.setDate(nextBillingAt.getDate() + 7 * input.intervalCount);
-    } else if (input.billingFrequency === BillingFrequency.MONTHLY) {
-      nextBillingAt.setMonth(nextBillingAt.getMonth() + input.intervalCount);
-    } else if (input.billingFrequency === BillingFrequency.YEARLY) {
-      nextBillingAt.setFullYear(nextBillingAt.getFullYear() + input.intervalCount);
+    // 1. Validate Customer
+    const customer = await prisma.customerProfile.findUnique({
+      where: { id: input.customerId },
+    });
+    if (!customer || customer.archivedAt) {
+      throw new Error("Customer profile does not exist or has been archived.");
     }
+
+    // 2. Validate Plan if provided
+    let plan = null;
+    if (input.planId) {
+      plan = await prisma.subscriptionPlan.findUnique({
+        where: { id: input.planId },
+      });
+      if (!plan || !plan.isActive || plan.archivedAt) {
+        throw new Error("Selected subscription plan is inactive or unavailable.");
+      }
+      if (plan.availableFrom && startAt < plan.availableFrom) {
+        throw new Error("Selected plan is not yet available on the subscription start date.");
+      }
+      if (plan.availableUntil && startAt > plan.availableUntil) {
+        throw new Error("Selected plan has expired and is not available on the subscription start date.");
+      }
+      if (Number(input.quantity) < Number(plan.minimumQuantity)) {
+        throw new Error(`Quantity (${input.quantity}) must be at least the plan minimum (${plan.minimumQuantity}).`);
+      }
+    }
+
+    // 3. Validate Products in lines
+    for (const line of input.lines) {
+      if (line.productId) {
+        const prod = await prisma.product.findUnique({
+          where: { id: line.productId },
+        });
+        if (!prod || !prod.isActive || prod.archivedAt) {
+          throw new Error(`Product ${line.description} is inactive or has been archived.`);
+        }
+      }
+    }
+
+    const subscriptionNumber = generateSubscriptionNumber();
+    const nextBillingAt = this.calculateNextBillingDate(startAt, input.billingFrequency, input.intervalCount);
 
     return await prisma.$transaction(async (tx) => {
       const subscription = await tx.subscription.create({
@@ -140,10 +198,10 @@ export class SubscriptionsService {
           quantity: input.quantity,
           currency: input.currency,
           paymentTermsDays: input.paymentTermsDays,
-          autoCloseAtEnd: input.autoCloseAtEnd,
-          allowEarlyClose: input.allowEarlyClose,
-          allowPause: input.allowPause,
-          allowRenewal: input.allowRenewal,
+          autoCloseAtEnd: plan?.autoCloseAtEnd ?? input.autoCloseAtEnd,
+          allowEarlyClose: plan?.allowEarlyClose ?? input.allowEarlyClose,
+          allowPause: plan?.allowPause ?? input.allowPause,
+          allowRenewal: plan?.allowRenewal ?? input.allowRenewal,
           createdById: actorUserId,
           lines: {
             create: input.lines.map((line) => ({
@@ -304,6 +362,11 @@ export class SubscriptionsService {
     });
   }
 
+  /**
+   * Idempotent invoice generation for a subscription billing period.
+   * Enforces duplicate billing prevention via BillingAttempt idempotencyKey.
+   * Authoritatively computes dual GST (18%) and snapshots all lines.
+   */
   static async generateInvoice(id: string, actorUserId: string) {
     const sub = await prisma.subscription.findUnique({
       where: { id },
@@ -318,43 +381,65 @@ export class SubscriptionsService {
       throw new Error(`Cannot generate invoice for subscription in status: ${sub.status}`);
     }
 
-    const invoiceNumber = generateInvoiceNumber();
     const issueDate = new Date();
     const dueDate = new Date(issueDate);
     dueDate.setDate(dueDate.getDate() + (sub.paymentTermsDays || 15));
 
-    // Calculate totals from subscription lines
-    let subtotal = 0;
-    const invoiceLinesData = sub.lines.map((sl) => {
-      const lineSub = Number(sl.quantity) * Number(sl.unitPrice);
-      subtotal += lineSub;
-      return {
-        productId: sl.productId,
-        subscriptionLineId: sl.id,
-        descriptionSnapshot: sl.descriptionSnapshot,
-        quantity: sl.quantity,
-        unitPrice: sl.unitPrice,
-        taxableAmount: lineSub,
-        taxAmount: 0,
-        lineTotal: lineSub,
-      };
+    const periodStart = sub.lastBilledAt || sub.startAt;
+    const periodEnd = sub.nextBillingAt || issueDate;
+
+    // Idempotency guard: format deterministic key
+    const idempotencyKey = `sub_${sub.id}_${periodStart.toISOString().slice(0, 10)}_${periodEnd.toISOString().slice(0, 10)}`;
+
+    // Check if an attempt for this period already succeeded
+    const existingAttempt = await prisma.billingAttempt.findUnique({
+      where: { idempotencyKey },
+      include: {
+        invoice: {
+          include: { lines: true, allocations: true },
+        },
+      },
     });
 
-    const grandTotal = subtotal;
-
-    // Advance next billing date
-    const nextBillingAt = sub.nextBillingAt ? new Date(sub.nextBillingAt) : new Date();
-    if (sub.billingFrequency === BillingFrequency.DAILY) {
-      nextBillingAt.setDate(nextBillingAt.getDate() + sub.intervalCount);
-    } else if (sub.billingFrequency === BillingFrequency.WEEKLY) {
-      nextBillingAt.setDate(nextBillingAt.getDate() + 7 * sub.intervalCount);
-    } else if (sub.billingFrequency === BillingFrequency.MONTHLY) {
-      nextBillingAt.setMonth(nextBillingAt.getMonth() + sub.intervalCount);
-    } else if (sub.billingFrequency === BillingFrequency.YEARLY) {
-      nextBillingAt.setFullYear(nextBillingAt.getFullYear() + sub.intervalCount);
+    if (existingAttempt && existingAttempt.status === BillingAttemptStatus.SUCCEEDED && existingAttempt.invoice) {
+      // Duplicate invoice prevented!
+      return existingAttempt.invoice;
     }
 
+    // Prepare lines for BillingCalculationService
+    const calcLines = sub.lines.map((sl) => ({
+      productId: sl.productId,
+      planId: sl.planId,
+      description: sl.descriptionSnapshot,
+      quantity: Number(sl.quantity),
+      unitPrice: Number(sl.unitPrice),
+      variantSnapshot: sl.variantSnapshot,
+    }));
+
+    const calcResult = await BillingCalculationService.calculateDocument({
+      lines: calcLines,
+      customerState: sub.customer?.state,
+    });
+
+    const invoiceNumber = generateInvoiceNumber();
+    const nextBillingAt = this.calculateNextBillingDate(periodEnd, sub.billingFrequency, sub.intervalCount);
+
     return await prisma.$transaction(async (tx) => {
+      // Find or create an open BillingRun
+      let billingRun = await tx.billingRun.findFirst({
+        where: { status: "RUNNING" },
+      });
+      if (!billingRun) {
+        billingRun = await tx.billingRun.create({
+          data: {
+            runKey: `MANUAL_RUN_${Date.now()}`,
+            triggeredBy: "USER_ACTION",
+            status: "RUNNING",
+          },
+        });
+      }
+
+      // Create the Invoice with dual GST snapshots
       const invoice = await tx.invoice.create({
         data: {
           invoiceNumber,
@@ -363,21 +448,54 @@ export class SubscriptionsService {
           status: InvoiceStatus.CONFIRMED,
           issueDate,
           dueDate,
-          billingPeriodStart: sub.lastBilledAt || sub.startAt,
-          billingPeriodEnd: issueDate,
+          billingPeriodStart: periodStart,
+          billingPeriodEnd: periodEnd,
           currency: sub.currency,
-          subtotal,
-          discountTotal: 0,
-          taxTotal: 0,
-          grandTotal,
+          subtotal: calcResult.subtotal,
+          discountTotal: calcResult.discountTotal,
+          taxTotal: calcResult.taxTotal,
+          grandTotal: calcResult.grandTotal,
           confirmedAt: issueDate,
           lines: {
-            create: invoiceLinesData,
+            create: calcResult.lines.map((cl, idx) => ({
+              productId: cl.productId,
+              subscriptionLineId: sub.lines[idx]?.id || null,
+              descriptionSnapshot: cl.descriptionSnapshot,
+              quantity: cl.quantity,
+              unitPrice: cl.unitPrice,
+              taxableAmount: cl.taxableAmount,
+              taxAmount: cl.taxAmount,
+              discountAmount: cl.discountAmount,
+              lineTotal: cl.lineTotal,
+              taxSnapshot: cl.taxSnapshot,
+              variantSnapshot: cl.variantSnapshot,
+            })),
           },
         },
         include: { lines: true },
       });
 
+      // Persist or update BillingAttempt to prevent duplicate billing
+      await tx.billingAttempt.upsert({
+        where: { idempotencyKey },
+        create: {
+          billingRunId: billingRun.id,
+          subscriptionId: sub.id,
+          invoiceId: invoice.id,
+          idempotencyKey,
+          periodStart,
+          periodEnd,
+          status: BillingAttemptStatus.SUCCEEDED,
+          finishedAt: new Date(),
+        },
+        update: {
+          invoiceId: invoice.id,
+          status: BillingAttemptStatus.SUCCEEDED,
+          finishedAt: new Date(),
+        },
+      });
+
+      // Advance schedule
       await tx.subscription.update({
         where: { id: sub.id },
         data: {
@@ -393,7 +511,7 @@ export class SubscriptionsService {
           action: "GENERATE_SUBSCRIPTION_INVOICE",
           entityType: "Invoice",
           entityId: invoice.id,
-          summary: `Generated invoice ${invoice.invoiceNumber} for subscription ${sub.subscriptionNumber}`,
+          summary: `Generated invoice ${invoice.invoiceNumber} for subscription ${sub.subscriptionNumber} (${calcResult.grandTotal} INR)`,
         },
       });
 
@@ -401,4 +519,5 @@ export class SubscriptionsService {
     });
   }
 }
+
 

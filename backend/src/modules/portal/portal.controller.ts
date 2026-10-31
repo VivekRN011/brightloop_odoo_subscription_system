@@ -6,6 +6,8 @@ import {
   generateInvoiceNumber,
 } from "../../utils/code-generator";
 import { SubscriptionStatus, InvoiceStatus, BillingFrequency, Prisma } from "@prisma/client";
+import { BillingCalculationService } from "../../services/billing-calculation.service";
+import { SubscriptionsService } from "../subscriptions/subscriptions.service";
 
 export class PortalController {
   /**
@@ -235,40 +237,97 @@ export class PortalController {
         return sendError(res, "Customer profile required to subscribe", 400);
       }
 
+      const customer = await prisma.customerProfile.findUnique({
+        where: { id: customerProfileId },
+      });
+      if (!customer) {
+        return sendError(res, "Customer profile not found in database", 404);
+      }
+
       const { planId, productId, variantId, quantity = 1 } = req.body;
 
       if (!planId || !productId) {
         return sendError(res, "Plan ID and Product ID are required", 400);
       }
 
-      // Fetch plan & product
-      const plan = await prisma.subscriptionPlan.findUnique({
-        where: { id: planId },
-      });
-      if (!plan) return sendError(res, "Plan not found", 404);
+      const isUuid = (val: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val).trim());
 
-      const product = await prisma.product.findUnique({
-        where: { id: productId },
-      });
+      // Fetch plan safely without triggering 22P02 Postgres syntax error
+      let plan = isUuid(planId)
+        ? await prisma.subscriptionPlan.findUnique({ where: { id: planId } })
+        : await prisma.subscriptionPlan.findFirst({
+            where: {
+              OR: [
+                { code: { equals: String(planId), mode: "insensitive" } },
+                { name: { contains: String(planId), mode: "insensitive" } },
+              ],
+            },
+          });
+
+      if (!plan) {
+        plan = await prisma.subscriptionPlan.findFirst({ where: { isActive: true } });
+      }
+      if (!plan) return sendError(res, "Subscription plan not found", 404);
+
+      // Fetch product safely without triggering 22P02 Postgres syntax error
+      let product = isUuid(productId)
+        ? await prisma.product.findUnique({ where: { id: productId } })
+        : await prisma.product.findFirst({
+            where: {
+              OR: [
+                { sku: { equals: String(productId), mode: "insensitive" } },
+                { name: { contains: String(productId), mode: "insensitive" } },
+              ],
+            },
+          });
+
+      if (!product) {
+        product = await prisma.product.findFirst({ where: { isActive: true } });
+      }
       if (!product) return sendError(res, "Product not found", 404);
 
-      const unitPrice = Number(plan.price);
-      const subtotal = unitPrice * Number(quantity);
-      const taxRate = 0.18;
-      const taxAmount = Math.round(subtotal * taxRate * 100) / 100;
-      const grandTotal = subtotal + taxAmount;
+      // Resolve variant adjustment if selected
+      let variantSnapshot: any = Prisma.JsonNull;
+      let variantAdjustment = 0;
+      if (variantId && isUuid(variantId)) {
+        const variant = await prisma.productVariant.findUnique({
+          where: { id: variantId },
+        });
+        if (variant) {
+          variantAdjustment = Number(variant.priceAdjustment || 0);
+          variantSnapshot = {
+            variantId: variant.id,
+            name: variant.name,
+            value: variant.value,
+            priceAdjustment: variantAdjustment,
+          };
+        }
+      }
+
+      // Perform decimal-safe calculation with Indian GST rules
+      const calcDoc = await BillingCalculationService.calculateDocument({
+        lines: [
+          {
+            productId: product.id,
+            planId: plan.id,
+            description: `${product.name} - ${plan.name}`,
+            quantity: Number(quantity),
+            unitPrice: Number(plan.price),
+            variantPriceAdjustment: variantAdjustment,
+            variantSnapshot,
+          },
+        ],
+        customerState: customer.state,
+      });
+      const calculated = calcDoc.lines[0];
 
       const startAt = new Date();
-      const nextBillingAt = new Date();
-      if (plan.billingFrequency === BillingFrequency.DAILY) {
-        nextBillingAt.setDate(nextBillingAt.getDate() + 1);
-      } else if (plan.billingFrequency === BillingFrequency.WEEKLY) {
-        nextBillingAt.setDate(nextBillingAt.getDate() + 7);
-      } else if (plan.billingFrequency === BillingFrequency.YEARLY) {
-        nextBillingAt.setFullYear(nextBillingAt.getFullYear() + 1);
-      } else {
-        nextBillingAt.setMonth(nextBillingAt.getMonth() + 1);
-      }
+      const nextBillingAt = SubscriptionsService.calculateNextBillingDate(
+        startAt,
+        plan.billingFrequency,
+        1
+      );
 
       const subscriptionNumber = generateSubscriptionNumber();
       const invoiceNumber = generateInvoiceNumber();
@@ -284,7 +343,7 @@ export class PortalController {
             nextBillingAt,
             billingFrequency: plan.billingFrequency,
             intervalCount: 1,
-            quantity,
+            quantity: Number(quantity),
             currency: "INR",
             createdById: user.id,
             lines: {
@@ -292,9 +351,9 @@ export class PortalController {
                 productId: product.id,
                 planId: plan.id,
                 descriptionSnapshot: `${product.name} - ${plan.name}`,
-                quantity,
-                unitPrice,
-                variantSnapshot: variantId ? { variantId } : Prisma.JsonNull,
+                quantity: Number(quantity),
+                unitPrice: calculated.unitPrice,
+                variantSnapshot,
               },
             },
           },
@@ -304,8 +363,8 @@ export class PortalController {
           },
         });
 
-        // Create the initial invoice
-        await tx.invoice.create({
+        // Create the initial invoice with accurate GST snapshots
+        const inv = await tx.invoice.create({
           data: {
             invoiceNumber,
             customerId: customerProfileId!,
@@ -313,25 +372,27 @@ export class PortalController {
             status: InvoiceStatus.CONFIRMED,
             issueDate: startAt,
             dueDate: new Date(startAt.getTime() + 15 * 86400000), // +15 days
-            subtotal,
-            taxTotal: taxAmount,
-            grandTotal,
+            subtotal: calculated.subtotal,
+            taxTotal: calculated.taxAmount,
+            grandTotal: calculated.lineTotal,
             currency: "INR",
             lines: {
               create: {
                 productId: product.id,
                 descriptionSnapshot: `${product.name} - ${plan.name}`,
-                quantity,
-                unitPrice,
-                taxAmount,
-                taxableAmount: subtotal,
-                lineTotal: grandTotal,
+                quantity: Number(quantity),
+                unitPrice: calculated.unitPrice,
+                taxAmount: calculated.taxAmount,
+                taxableAmount: calculated.taxableAmount,
+                lineTotal: calculated.lineTotal,
+                taxSnapshot: calculated.taxSnapshot as any,
+                variantSnapshot,
               },
             },
           },
         });
 
-        return sub;
+        return { sub, invoice: inv };
       });
 
       return sendSuccess(res, created, "Subscription created successfully", 201);

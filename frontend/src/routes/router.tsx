@@ -4,6 +4,7 @@ import { AdminCustomersPage } from '@/features/customers/pages/AdminCustomersPag
 import { AdminPaymentsPage } from '@/features/payments/pages/AdminPaymentsPage';
 import { AdminPlansPage } from '@/features/plans';
 import { AdminQuotationsPage } from '@/features/quotations';
+import { AdminProductsPage } from '@/features/products/pages/AdminProductsPage';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -125,19 +126,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'products',
-        element: (
-          <PlaceholderPage
-            title="Products & Variants"
-            description="Configure subscription products, cost prices, sales prices, and product variants."
-            category="Catalog"
-            plannedFeatures={[
-              'Product catalog management storing name, type, sales price, cost price, and notes (PRD FR-PROD-02)',
-              'Product variant attributes (e.g. Brand, Tier) with price adjustments (FR-PROD-03/05)',
-              'Product activation and deactivation toggles',
-              'Historical invoice pricing immutability (FR-PROD-07)',
-            ]}
-          />
-        ),
+        element: <AdminProductsPage />,
       },
       {
         path: 'plans',

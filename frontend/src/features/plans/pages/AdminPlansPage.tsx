@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { planService } from '../services/plan.service';
 import type { SubscriptionPlan, BillingFrequency } from '../models/plan.types';
 import { toast } from 'sonner';
@@ -153,7 +153,7 @@ export const AdminPlansPage: React.FC = () => {
           </div>
           <div className="mt-3">
             <span className="text-2xl font-extrabold text-primary font-headline">Enterprise</span>
-            <span className="text-xs text-on-surface-variant ml-2">₹2.88 Cr ARR</span>
+            <span className="text-xs text-on-surface-variant ml-2">Γé╣2.88 Cr ARR</span>
           </div>
           <div className="text-[11px] text-on-surface-variant mt-2">78% of active customer subscriptions</div>
         </div>
@@ -164,7 +164,7 @@ export const AdminPlansPage: React.FC = () => {
             <span className="material-symbols-outlined text-primary text-lg">trending_up</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-on-surface font-headline">₹48,200</span>
+            <span className="text-2xl font-extrabold text-on-surface font-headline">Γé╣48,200</span>
             <span className="text-xs text-on-surface-variant ml-2">/ billing run</span>
           </div>
           <div className="text-[11px] text-emerald-700 mt-2 font-medium">+14.2% expansion rate</div>
@@ -279,7 +279,7 @@ export const AdminPlansPage: React.FC = () => {
                   <div className="mt-4 pt-4 border-t border-outline-variant/60">
                     <div className="flex items-baseline gap-1">
                       <span className="text-2xl font-extrabold text-on-surface font-headline">
-                        ₹{plan.price.toLocaleString('en-IN')}
+                        Γé╣{plan.price.toLocaleString('en-IN')}
                       </span>
                       <span className="text-xs text-on-surface-variant font-medium">
                         /{' '}
@@ -287,7 +287,7 @@ export const AdminPlansPage: React.FC = () => {
                       </span>
                     </div>
                     <div className="text-[10px] text-outline mt-1 font-mono">
-                      Min Quantity: {plan.minimumQuantity} • Prorated: Yes
+                      Min Quantity: {plan.minimumQuantity} ΓÇó Prorated: Yes
                     </div>
                   </div>
 
@@ -416,7 +416,7 @@ export const AdminPlansPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-on-surface-variant font-semibold mb-1">Base Price (₹)</label>
+                  <label className="block text-on-surface-variant font-semibold mb-1">Base Price (Γé╣)</label>
                   <input
                     type="number"
                     value={basePrice}

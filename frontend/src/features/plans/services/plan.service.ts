@@ -99,34 +99,42 @@ export const mockPlansExtended: SubscriptionPlan[] = [
 
 export const planService = {
   /**
-   * Fetch all active subscription plans
+   * Fetch all active subscription plans from backend
    */
   async getPlans(): Promise<SubscriptionPlan[]> {
     try {
       const response = await api.get('/plans');
       const payload = response.data?.data || response.data;
-      const items = Array.isArray(payload) ? payload : payload?.items || payload?.plans;
-      if (Array.isArray(items) && items.length > 0) {
-        return items.map((p: any) => ({
-          id: p.id,
-          code: p.code || p.planCode,
-          name: p.name,
-          description: p.description || '',
-          billingFrequency: (p.billingFrequency || p.billingInterval || p.interval || 'MONTHLY') as SubscriptionPlan['billingFrequency'],
-          intervalCount: p.intervalCount || 1,
-          price: Number(p.price || p.basePrice || 0),
-          currency: 'INR',
-          minimumQuantity: p.minimumQuantity || p.minQuantity || 1,
-          autoCloseAtEnd: Boolean(p.autoCloseAtEnd || p.autoClose),
-          isActive: p.isActive !== false,
-          allowRenewal: p.allowRenewal !== false,
-          allowPause: p.allowPause !== false,
-          allowEarlyClose: p.allowEarlyClose !== false,
-          popular: p.popular || false,
-          badge: p.badge,
-          features: Array.isArray(p.features) ? p.features : [
-            'Automated GST compliance engine',
-            'Full API & customer portal access',
+      const items = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload?.plans)
+        ? payload.plans
+        : null;
+
+      if (items && items.length > 0) {
+        return items.map((raw: any) => ({
+          id: raw.id,
+          code: raw.code || raw.planCode,
+          name: raw.name,
+          description: raw.description || '',
+          billingFrequency: (raw.billingFrequency || raw.billingInterval || raw.interval || 'MONTHLY'),
+          intervalCount: raw.intervalCount || 1,
+          price: Number(raw.price ?? raw.basePrice ?? 0),
+          currency: raw.currency || 'INR',
+          minimumQuantity: Number(raw.minimumQuantity || raw.minQuantity || 1),
+          isActive: raw.isActive !== false,
+          autoCloseAtEnd: Boolean(raw.autoCloseAtEnd ?? raw.autoClose ?? false),
+          allowEarlyClose: raw.allowEarlyClose !== false,
+          allowPause: raw.allowPause !== false,
+          allowRenewal: raw.allowRenewal !== false,
+          popular: raw.popular || false,
+          badge: raw.badge,
+          features: Array.isArray(raw.features) ? raw.features : [
+            `${raw.billingFrequency || 'Recurring'} automated billing run`,
+            'Dual Indian GST itemized line snapshots',
+            'Full commercial lifecycle audit trail',
           ],
         }));
       }
@@ -137,13 +145,34 @@ export const planService = {
   },
 
   /**
-   * Fetch plan by id or plan code
+   * Fetch plan by id or plan code from backend
    */
   async getPlanByCode(codeOrId: string): Promise<SubscriptionPlan | null> {
     try {
       const response = await api.get(`/plans/${codeOrId}`);
       if (response.data?.success && response.data.data) {
-        return response.data.data;
+        const raw = response.data.data;
+        return {
+          id: raw.id,
+          code: raw.code,
+          name: raw.name,
+          description: raw.description || '',
+          billingFrequency: raw.billingFrequency,
+          intervalCount: raw.intervalCount || 1,
+          price: Number(raw.price),
+          currency: raw.currency || 'INR',
+          minimumQuantity: Number(raw.minimumQuantity || 1),
+          isActive: raw.isActive,
+          autoCloseAtEnd: raw.autoCloseAtEnd ?? true,
+          allowEarlyClose: raw.allowEarlyClose ?? true,
+          allowPause: raw.allowPause ?? true,
+          allowRenewal: raw.allowRenewal ?? true,
+          features: [
+            `${raw.billingFrequency} automated billing run`,
+            'Dual Indian GST itemized line snapshots',
+            'Full commercial lifecycle audit trail',
+          ],
+        };
       }
       const found = mockPlansExtended.find((p) => p.code === codeOrId || p.id === codeOrId);
       return found || null;
