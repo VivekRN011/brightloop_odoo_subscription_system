@@ -1,19 +1,30 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
-import { LoginPage } from '@/features/auth/LoginPage';
+import { LoginPage, RegisterPage } from '@/features/auth';
+import {
+  CustomerDashboardPage,
+  CustomerSubscriptionsPage,
+  CustomerInvoicesPage,
+  CustomerProfilePage,
+} from '@/features/customer-portal';
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 import { NotFoundPage } from './NotFoundPage';
 import { PortalLayout } from '@/features/portal/PortalLayout';
+import { RootRedirect } from './RootRedirect';
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <Navigate to="/app/dashboard" replace />,
+    element: <RootRedirect />,
   },
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/register',
+    element: <RegisterPage />,
   },
   {
     path: '/portal',
@@ -21,67 +32,19 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: (
-          <PlaceholderPage
-            title="Subscriber Dashboard"
-            description="Overview of your active subscriptions, current billing period, and pending payments."
-            category="Customer Portal"
-            plannedFeatures={[
-              'Customer session boundary strictly isolated from admin data (PRD G-07, FR-AUTH-09)',
-              'Current active subscription details and upcoming renewal dates',
-              'Outstanding balance summary and quick pay action',
-              'Recent payment history and receipts',
-            ]}
-          />
-        ),
+        element: <CustomerDashboardPage />,
       },
       {
         path: 'subscriptions',
-        element: (
-          <PlaceholderPage
-            title="My Subscriptions"
-            description="View your subscribed products, plans, renewal terms, and service agreements."
-            category="Customer Portal"
-            plannedFeatures={[
-              'View only the signed-in customer’s subscriptions (PRD Section 4.3)',
-              'Inspect subscription lines, quantities, and plan billing cycles',
-              'Request plan change or pause if permitted by plan configuration',
-              'Renewal preferences and contract termination notice',
-            ]}
-          />
-        ),
+        element: <CustomerSubscriptionsPage />,
       },
       {
         path: 'invoices',
-        element: (
-          <PlaceholderPage
-            title="My Invoices"
-            description="View and download tax invoices for your subscription accounts."
-            category="Customer Portal"
-            plannedFeatures={[
-              'View only own customer invoices (PRD Section 4.3)',
-              'Download GST-compliant tax invoice PDFs',
-              'Inspect itemized line items, applied discounts, and taxes',
-              'View payment settlement status (Paid, Confirmed, Overdue)',
-            ]}
-          />
-        ),
+        element: <CustomerInvoicesPage />,
       },
       {
         path: 'profile',
-        element: (
-          <PlaceholderPage
-            title="Billing Profile & Tax Details"
-            description="Manage your company details, GSTIN, PAN, and billing address."
-            category="Customer Portal"
-            plannedFeatures={[
-              'Company legal name and primary contact details',
-              'Registered GSTIN and PAN verification',
-              'Billing address and state of supply configuration',
-              'Preferred payment notification contacts',
-            ]}
-          />
-        ),
+        element: <CustomerProfilePage />,
       },
     ],
   },

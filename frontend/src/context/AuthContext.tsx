@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authService, DEMO_USERS } from '@/features/auth/services/auth.service';
+import type { LoginFormData, RegisterFormData } from '@/features/auth/schemas/auth.schemas';
 
 export type UserRole = 'ADMIN' | 'STAFF' | 'CUSTOMER';
 
@@ -8,49 +10,71 @@ export interface User {
   email: string;
   role: UserRole;
   avatarUrl?: string;
+  companyName?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  role: UserRole;
+  role: UserRole | null;
   isAuthenticated: boolean;
-  login: (email: string, role?: UserRole) => void;
+  login: (credentials: LoginFormData) => Promise<User>;
+  register: (data: RegisterFormData) => Promise<User>;
   logout: () => void;
+  switchDemoRole: (role: UserRole) => void;
 }
-
-const DEFAULT_ADMIN_USER: User = {
-  id: 'usr-admin-01',
-  name: 'Alex Morgan',
-  email: 'alex.morgan@brightloop.io',
-  role: 'ADMIN',
-};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(DEFAULT_ADMIN_USER);
+  // Initialize with persisted session if available, defaulting to Admin demo user for convenience
+  const [user, setUser] = useState<User | null>(() => {
+    const saved = authService.getSession();
+    return saved || DEMO_USERS.admin;
+  });
 
-  const login = (email: string, role: UserRole = 'ADMIN') => {
-    setUser({
-      id: 'usr-' + Date.now(),
-      name: email.split('@')[0].replace('.', ' '),
-      email,
-      role,
-    });
+  useEffect(() => {
+    if (user) {
+      authService.saveSession(user);
+    } else {
+      authService.clearSession();
+    }
+  }, [user]);
+
+  const login = async (credentials: LoginFormData): Promise<User> => {
+    const response = await authService.login(credentials);
+    setUser(response.user);
+    return response.user;
+  };
+
+  const register = async (data: RegisterFormData): Promise<User> => {
+    const response = await authService.register(data);
+    setUser(response.user);
+    return response.user;
   };
 
   const logout = () => {
+    authService.clearSession();
     setUser(null);
+  };
+
+  const switchDemoRole = (role: UserRole) => {
+    const key = role.toLowerCase() as keyof typeof DEMO_USERS;
+    const demo = DEMO_USERS[key];
+    if (demo) {
+      setUser(demo);
+    }
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        role: user?.role || 'ADMIN',
+        role: user?.role || null,
         isAuthenticated: !!user,
         login,
+        register,
         logout,
+        switchDemoRole,
       }}
     >
       {children}
@@ -65,4 +89,3 @@ export function useAuth(): AuthContextType {
   }
   return context;
 }
-

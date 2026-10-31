@@ -5,7 +5,7 @@ import { Header } from './Header';
 import { useAuth } from '@/context/AuthContext';
 
 export const AdminLayout: React.FC = () => {
-  const { role } = useAuth();
+  const { role, isAuthenticated } = useAuth();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('brightloop_sidebar_collapsed') === 'true';
@@ -15,6 +15,11 @@ export const AdminLayout: React.FC = () => {
   });
 
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Authentication guard: Unauthenticated users are redirected to login
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
   // Strictly enforce security separation: Customer role must never access admin routes (PRD G-07, G-08, FR-AUTH-09)
   if (role === 'CUSTOMER') {

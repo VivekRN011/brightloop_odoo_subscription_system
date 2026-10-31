@@ -546,3 +546,116 @@
   }
 }
 
+
+/* ==========================================================================
+   Authentication Pages (Login & Registration Split Screen)
+   Adapted from Vital Admin Design System
+   ========================================================================== */
+
+.login-page {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--bl-bg);
+  color: var(--bl-foreground);
+}
+
+.login-page__left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 480px;
+  margin: auto 0;
+  padding: 32px;
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dropdown);
+}
+
+.login-page__right {
+  flex: 1.15;
+  position: relative;
+  display: none;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1e3a8a 0%, #312e81 40%, #3730a3 100%);
+  color: #ffffff;
+}
+
+@media (min-width: 960px) {
+  .login-page__right {
+    display: flex;
+  }
+}
+
+.login-page__panel {
+  height: 100%;
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 64px 48px;
+  gap: 20px;
+}
+
+.login-demo {
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  background: var(--bl-subtle);
+  border: 1px solid var(--bl-border);
+}
+
+.login-demo__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.login-demo__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--bl-border);
+  background: var(--bl-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.login-demo__btn:hover {
+  border-color: var(--bl-primary);
+  background: var(--bl-primary-subtle);
+}
+
+.login-demo__role {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--bl-primary);
+}
+
+.login-demo__email {
+  font-size: 0.68rem;
+  color: var(--bl-muted-foreground);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
