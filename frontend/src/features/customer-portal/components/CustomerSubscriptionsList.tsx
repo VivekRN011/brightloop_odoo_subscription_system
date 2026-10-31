@@ -71,7 +71,12 @@ export const CustomerSubscriptionsList: React.FC<CustomerSubscriptionsListProps>
                   className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors"
                 >
                   <td className="py-3.5 px-4 font-semibold text-indigo-600 dark:text-indigo-400">
-                    {sub.subscriptionNumber}
+                    <Link
+                      to={`/portal/subscriptions/${sub.id}`}
+                      className="hover:underline flex items-center gap-1 font-mono"
+                    >
+                      <span>{sub.subscriptionNumber}</span>
+                    </Link>
                   </td>
                   <td className="py-3.5 px-4">
                     <div className="font-semibold text-slate-900 dark:text-slate-100">

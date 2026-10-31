@@ -1,8 +1,11 @@
 export { CustomerDashboardPage } from './pages/CustomerDashboardPage';
 export { CustomerSubscriptionsPage } from './pages/CustomerSubscriptionsPage';
+export { CustomerSubscriptionDetailPage } from './pages/CustomerSubscriptionDetailPage';
 export { CustomerInvoicesPage } from './pages/CustomerInvoicesPage';
+export { CustomerInvoiceDetailPage } from './pages/CustomerInvoiceDetailPage';
+export { CustomerPaymentsPage } from './pages/CustomerPaymentsPage';
 export { CustomerProfilePage } from './pages/CustomerProfilePage';
 export * from './models/customerPortal.types';
 export * from './services/customerPortal.service';
 export * from './hooks/useCustomerPortal';
-
+export * from './data/customerPortal.fixtures';

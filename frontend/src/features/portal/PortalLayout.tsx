@@ -4,6 +4,7 @@ import {
   Zap,
   Repeat,
   Receipt,
+  CreditCard,
   User,
   LogOut,
   LayoutDashboard,
@@ -27,6 +28,7 @@ export const PortalLayout: React.FC = () => {
     { label: 'Overview', to: '/portal', end: true, icon: Zap },
     { label: 'My Subscriptions', to: '/portal/subscriptions', icon: Repeat },
     { label: 'My Invoices', to: '/portal/invoices', icon: Receipt },
+    { label: 'Payment History', to: '/portal/payments', icon: CreditCard },
     { label: 'Profile & Tax Details', to: '/portal/profile', icon: User },
   ];
 

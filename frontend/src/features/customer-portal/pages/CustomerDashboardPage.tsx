@@ -5,6 +5,7 @@ import {
   Calendar,
   AlertCircle,
   Receipt,
+  CreditCard,
   FileCheck,
   Building,
   ArrowRight,
@@ -273,6 +274,17 @@ export const CustomerDashboardPage: React.FC = () => {
                 <div className="flex items-center gap-2.5">
                   <Receipt size={15} className="text-emerald-600 dark:text-emerald-400" />
                   <span>Download Invoices &amp; Receipts</span>
+                </div>
+                <ArrowRight size={14} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+
+              <Link
+                to="/portal/payments"
+                className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 hover:border-indigo-200 dark:hover:border-indigo-800/60 text-xs font-semibold text-slate-800 dark:text-slate-200 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <CreditCard size={15} className="text-indigo-600 dark:text-indigo-400" />
+                  <span>Review Payment Receipts</span>
                 </div>
                 <ArrowRight size={14} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
               </Link>

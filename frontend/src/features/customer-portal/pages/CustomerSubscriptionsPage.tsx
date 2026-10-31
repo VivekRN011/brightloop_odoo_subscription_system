@@ -119,7 +119,12 @@ export const CustomerSubscriptionsPage: React.FC = () => {
                     className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors"
                   >
                     <td className="py-4 px-4 font-bold font-mono text-indigo-600 dark:text-indigo-400">
-                      {sub.subscriptionNumber}
+                      <Link
+                        to={`/portal/subscriptions/${sub.id}`}
+                        className="hover:underline flex items-center gap-1"
+                      >
+                        {sub.subscriptionNumber}
+                      </Link>
                     </td>
                     <td className="py-4 px-4">
                       <div className="font-semibold text-slate-900 dark:text-slate-100">
