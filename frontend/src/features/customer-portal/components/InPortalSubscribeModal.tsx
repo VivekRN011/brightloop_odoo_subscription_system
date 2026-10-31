@@ -24,6 +24,7 @@ export interface InPortalSubscribeModalProps {
   onClose: () => void;
   initialProductId?: string;
   initialPlanCode?: string;
+  onSuccess?: () => void;
 }
 
 export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
@@ -31,6 +32,7 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
   onClose,
   initialProductId,
   initialPlanCode,
+  onSuccess,
 }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -122,7 +124,7 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
         quantity,
       });
 
-      const responseData = res.data?.data;
+const responseData = res.data?.data;
       const sub = responseData?.sub || responseData?.subscription || responseData;
       const invoice = responseData?.invoice;
 
@@ -153,6 +155,7 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
             result.payment?.gatewayPaymentId || result.payment?.reference || 'Verified'
           );
           queryClient.invalidateQueries({ queryKey: ['portal'] });
+          onSuccess?.();
           setStep(3); // Success step
         },
         onError: (err) => {
@@ -169,6 +172,7 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
         },
       });
     } catch (err: any) {
+
       setIsSubmitting(false);
       setPaymentError(
         err.response?.data?.message || err.message || 'Failed to initialize subscription checkout.'
