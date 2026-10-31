@@ -52,7 +52,7 @@ app.get("/api/v1/health", async (_req, res) => {
   }
 });
 
-// Domain routes for 2.1 & 2.2 features
+// Domain routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/customers", customersRoutes);
 app.use("/api/v1/products", productsRoutes);
