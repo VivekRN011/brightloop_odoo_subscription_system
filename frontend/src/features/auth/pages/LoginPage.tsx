@@ -38,7 +38,6 @@ export const LoginPage: React.FC = () => {
   const {
     register,
     handleSubmit,
-    setValue,
     getValues,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
@@ -375,77 +374,6 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Quick-Fill Demo Credentials Bar */}
-          <div className="mt-8 p-4 rounded-xl bg-surface-container-low/70 border border-outline-variant/60">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[15px] text-primary">
-                  verified_user
-                </span>
-                Quick-Fill Demo Credentials
-              </span>
-              <span className="text-[10px] text-on-surface-variant font-medium">Click to populate</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleFillDemo('admin')}
-                className="group p-2.5 rounded-lg border border-outline-variant/60 bg-card-pure hover:border-primary/50 hover:bg-surface-container-high transition-all text-left flex flex-col justify-between cursor-pointer shadow-2xs"
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-secondary-container text-primary">
-                    Admin
-                  </span>
-                  <span className="material-symbols-outlined text-[14px] text-outline group-hover:text-primary transition-colors">
-                    login
-                  </span>
-                </div>
-                <span className="text-[11px] font-medium text-on-surface truncate mt-1.5">
-                  admin@brightloop.io
-                </span>
-                <span className="text-[10px] text-on-surface-variant">Full Ops Control</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleFillDemo('staff')}
-                className="group p-2.5 rounded-lg border border-outline-variant/60 bg-card-pure hover:border-primary/50 hover:bg-surface-container-high transition-all text-left flex flex-col justify-between cursor-pointer shadow-2xs"
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
-                    Staff
-                  </span>
-                  <span className="material-symbols-outlined text-[14px] text-outline group-hover:text-primary transition-colors">
-                    login
-                  </span>
-                </div>
-                <span className="text-[11px] font-medium text-on-surface truncate mt-1.5">
-                  staff@brightloop.io
-                </span>
-                <span className="text-[10px] text-on-surface-variant">Billing Operations</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleFillDemo('customer')}
-                className="group p-2.5 rounded-lg border border-outline-variant/60 bg-card-pure hover:border-primary/50 hover:bg-surface-container-high transition-all text-left flex flex-col justify-between cursor-pointer shadow-2xs"
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
-                    Customer
-                  </span>
-                  <span className="material-symbols-outlined text-[14px] text-outline group-hover:text-primary transition-colors">
-                    login
-                  </span>
-                </div>
-                <span className="text-[11px] font-medium text-on-surface truncate mt-1.5">
-                  sarah.chen@acme.inc
-                </span>
-                <span className="text-[10px] text-on-surface-variant">Portal Subscriber</span>
-              </button>
-            </div>
-          </div>
 
           {/* Registration Link */}
           <div className="mt-6 pt-5 border-t border-outline-variant/40 text-center text-xs text-on-surface-variant">
