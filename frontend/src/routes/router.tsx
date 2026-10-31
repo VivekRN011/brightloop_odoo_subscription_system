@@ -1,3 +1,7 @@
+import { AdminSubscriptionsPage } from '@/features/subscriptions/pages/AdminSubscriptionsPage';
+import { AdminInvoicesPage } from '@/features/invoices/pages/AdminInvoicesPage';
+import { AdminCustomersPage } from '@/features/customers/pages/AdminCustomersPage';
+import { AdminPaymentsPage } from '@/features/payments/pages/AdminPaymentsPage';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -111,20 +115,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'customers',
-        element: (
-          <PlaceholderPage
-            title="Customers"
-            description="Manage corporate subscriber accounts, billing addresses, and tax identifiers."
-            category="Customer Management"
-            plannedFeatures={[
-              'Customer listing with search, sorting, and status filtering',
-              'Company profiles with GSTIN, PAN, and contact details',
-              'Billing and shipping address management',
-              'Customer-specific payment terms and discount overrides',
-              'Complete subscription and invoice audit timeline',
-            ]}
-          />
-        ),
+        element: <AdminCustomersPage />,
       },
       {
         path: 'products',
@@ -192,67 +183,19 @@ export const router = createBrowserRouter([
       },
       {
         path: 'subscriptions',
-        element: (
-          <PlaceholderPage
-            title="Subscriptions"
-            description="Manage the complete lifecycle of customer recurring subscriptions."
-            category="Subscriptions"
-            plannedFeatures={[
-              'Complete 6 lifecycle states: Draft, Quotation, Confirmed, Active, Paused, Closed (PRD FR-SUB-07, Workflow WF-08)',
-              'Unique subscription identifier sequence (FR-SUB-01)',
-              'Plan-level permission enforcement for pause, early closure, and renewal (FR-SUB-09 to 12)',
-              'Next billing date tracking and automated recurring invoice triggers (FR-BILL-01)',
-            ]}
-          />
-        ),
+        element: <AdminSubscriptionsPage />,
       },
       {
         path: 'invoices',
-        element: (
-          <PlaceholderPage
-            title="Invoices"
-            description="Issue, track, and reconcile recurring billing invoices and payment collections."
-            category="Billing"
-            plannedFeatures={[
-              'Invoice lifecycle states: Draft, Confirmed, Paid, Cancelled (PRD FR-BILL-10)',
-              'Duplicate billing prevention for identical subscription periods (FR-BILL-11)',
-              'Itemized line items snapshotting product, tax, and discount at billing time (FR-BILL-13)',
-              'Confirm, cancel, send, and print invoice actions (FR-BILL-06 to 09)',
-            ]}
-          />
-        ),
+        element: <AdminInvoicesPage />,
       },
       {
         path: 'invoices/overdue',
-        element: (
-          <PlaceholderPage
-            title="Overdue Invoices"
-            description="Monitor and prioritize collections for confirmed invoices past their payment due date."
-            category="Billing"
-            plannedFeatures={[
-              'Identify confirmed invoices where outstanding balance > 0 and due date < current date (PRD FR-PAY-08, BR-18)',
-              'Overdue aging classification (1-15 days, 16-30 days, 30+ days overdue)',
-              'Direct payment recording action with outstanding amount pre-filled',
-              'Payment reminder follow-up log',
-            ]}
-          />
-        ),
+        element: <AdminInvoicesPage />,
       },
       {
         path: 'payments',
-        element: (
-          <PlaceholderPage
-            title="Payments"
-            description="Record manual collections and review automated online transactions."
-            category="Billing"
-            plannedFeatures={[
-              'Record payments associated with specific invoices (PRD FR-PAY-01/02)',
-              'Support payment methods: Cash, Bank Transfer, UPI, Cheque, Card (Database enum PaymentMethod)',
-              'Persist amount, date, reference note, and allocation (FR-PAY-03 to 06)',
-              'Recalculate invoice paid amount and outstanding balance with partial settlement support (FR-PAY-09)',
-            ]}
-          />
-        ),
+        element: <AdminPaymentsPage />,
       },
       {
         path: 'discounts',
