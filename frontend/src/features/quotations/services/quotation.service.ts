@@ -107,8 +107,8 @@ export const quotationService = {
     try {
       const response = await api.get('/quotations', { params });
       const payload = response.data?.data || response.data;
-      const items = Array.isArray(payload) ? payload : payload?.items || payload?.quotations;
-      if (Array.isArray(items) && items.length > 0) {
+      const items = Array.isArray(payload) ? payload : payload?.items || payload?.quotations || [];
+      if (Array.isArray(items)) {
         return items.map((q: any) => ({
           id: q.id,
           quotationNumber: q.quotationNumber || `QT-${q.id.slice(0, 6)}`,
@@ -124,9 +124,10 @@ export const quotationService = {
           linesCount: q.lines?.length || 1,
         }));
       }
-      return mockQuotations;
-    } catch {
-      return mockQuotations;
+      return [];
+    } catch (err) {
+      console.error('Failed to load quotations from API:', err);
+      return [];
     }
   },
 

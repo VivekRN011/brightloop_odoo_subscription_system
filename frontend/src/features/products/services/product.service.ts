@@ -15,7 +15,7 @@ export const productService = {
         ? response.data.data.items
         : null;
 
-      if (items && items.length > 0) {
+      if (Array.isArray(items)) {
         return items.map((raw: any) => ({
           id: raw.id,
           sku: raw.sku || '',
@@ -35,9 +35,10 @@ export const productService = {
           supportedBillingFrequencies: ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'],
         }));
       }
-      return mockProducts;
-    } catch {
-      return mockProducts;
+      return [];
+    } catch (err) {
+      console.error('Failed to load products from API:', err);
+      return [];
     }
   },
 

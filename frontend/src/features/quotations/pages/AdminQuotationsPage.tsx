@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { quotationService, type QuotationItem } from '../services/quotation.service';
+import { formatINR } from '@/lib/format';
 import { toast } from 'sonner';
 
 export const AdminQuotationsPage: React.FC = () => {
@@ -120,48 +121,59 @@ export const AdminQuotationsPage: React.FC = () => {
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-on-surface-variant font-semibold">
-            <span>Open Proposals</span>
+            <span>Total Proposals</span>
             <span className="material-symbols-outlined text-primary text-lg">draft</span>
           </div>
           <div className="mt-3">
             <span className="text-2xl font-extrabold text-on-surface font-headline">{quotations.length}</span>
-            <span className="text-xs text-on-surface-variant ml-2">in negotiation</span>
+            <span className="text-xs text-on-surface-variant ml-2">proposals</span>
           </div>
-          <div className="text-[11px] text-on-surface-variant mt-2">₹1.48 Cr pipeline volume</div>
+          <div className="text-[11px] text-on-surface-variant mt-2">
+            Pipeline: {formatINR(quotations.reduce((sum, q) => sum + (q.total || 0), 0))}
+          </div>
         </div>
 
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-on-surface-variant font-semibold">
-            <span>Accepted This Month</span>
+            <span>Accepted &amp; Converted</span>
             <span className="material-symbols-outlined text-emerald-600 text-lg">check_circle</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-primary font-headline">₹38,40,000</span>
+            <span className="text-2xl font-extrabold text-primary font-headline">
+              {formatINR(quotations.filter((q) => q.status === 'ACCEPTED' || q.status === 'CONVERTED').reduce((sum, q) => sum + (q.total || 0), 0))}
+            </span>
           </div>
-          <div className="text-[11px] text-emerald-700 mt-2 font-medium">Ready for subscription provisioning</div>
+          <div className="text-[11px] text-emerald-700 mt-2 font-medium">Ready for / active in billing</div>
         </div>
 
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-on-surface-variant font-semibold">
-            <span>Quote-to-Contract Rate</span>
+            <span>Conversion Rate</span>
             <span className="material-symbols-outlined text-primary text-lg">conversion_path</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-on-surface font-headline">68.4%</span>
-            <span className="text-xs text-emerald-700 font-semibold ml-2">+4.2%</span>
+            <span className="text-2xl font-extrabold text-on-surface font-headline">
+              {quotations.length > 0
+                ? `${((quotations.filter((q) => q.status === 'CONVERTED').length / quotations.length) * 100).toFixed(0)}%`
+                : '0%'}
+            </span>
+            <span className="text-xs text-emerald-700 font-semibold ml-2">converted</span>
           </div>
-          <div className="text-[11px] text-on-surface-variant mt-2">Avg 11 days turnaround</div>
+          <div className="text-[11px] text-on-surface-variant mt-2">Converted to live contracts</div>
         </div>
 
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-on-surface-variant font-semibold">
-            <span>Expiring Within 7 Days</span>
+            <span>Open Proposals</span>
             <span className="material-symbols-outlined text-amber-600 text-lg">schedule</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-amber-700 font-headline">3 proposals</span>
+            <span className="text-2xl font-extrabold text-amber-700 font-headline">
+              {quotations.filter((q) => q.status === 'SENT' || q.status === 'DRAFT').length}
+            </span>
+            <span className="text-xs text-on-surface-variant ml-2">pending</span>
           </div>
-          <div className="text-[11px] text-amber-800 mt-2 font-medium">Automatic expiry warning dispatched</div>
+          <div className="text-[11px] text-amber-800 mt-2 font-medium">Awaiting customer acceptance</div>
         </div>
       </section>
 

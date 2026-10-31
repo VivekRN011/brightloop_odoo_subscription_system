@@ -49,8 +49,8 @@ export const paymentService = {
     try {
       const response = await api.get('/payments', { params });
       const payload = response.data?.data || response.data;
-      const items = Array.isArray(payload) ? payload : payload.items || payload.payments;
-      if (Array.isArray(items) && items.length > 0) {
+      const items = Array.isArray(payload) ? payload : payload?.items || payload?.payments || [];
+      if (Array.isArray(items)) {
         return items.map((p: any) => ({
           id: p.id,
           paymentNumber: p.paymentNumber,
@@ -58,14 +58,20 @@ export const paymentService = {
           method: p.method,
           amount: Number(p.amount),
           paidAt: p.paidAt,
-          reference: p.reference || p.note,
+          reference: p.reference || p.note || p.gatewayPaymentId,
           status: p.status,
         }));
       }
-      return mockAdminPayments;
-    } catch {
-      return mockAdminPayments;
+      return [];
+    } catch (err) {
+      console.error('Failed to load payments from API:', err);
+      return [];
     }
+  },
+
+  async getPaymentById(id: string): Promise<any> {
+    const response = await api.get(`/payments/${id}`);
+    return response.data?.data || response.data;
   },
 
   async recordPayment(data: {

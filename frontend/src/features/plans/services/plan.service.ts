@@ -138,9 +138,10 @@ export const planService = {
           ],
         }));
       }
-      return mockPlansExtended;
-    } catch {
-      return mockPlansExtended;
+      return [];
+    } catch (err) {
+      console.error('Failed to load plans from API:', err);
+      return [];
     }
   },
 

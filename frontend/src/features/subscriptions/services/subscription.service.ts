@@ -87,8 +87,8 @@ export const subscriptionService = {
     try {
       const response = await api.get('/subscriptions', { params });
       const payload = response.data?.data || response.data;
-      const items = Array.isArray(payload) ? payload : payload.items || payload.subscriptions;
-      if (Array.isArray(items) && items.length > 0) {
+      const items = Array.isArray(payload) ? payload : payload?.items || payload?.subscriptions || [];
+      if (Array.isArray(items)) {
         return items.map((s: any) => ({
           id: s.id,
           subscriptionNumber: s.subscriptionNumber,
@@ -97,16 +97,22 @@ export const subscriptionService = {
           planName: s.plan?.name || 'Custom Plan',
           status: s.status,
           quantity: Number(s.quantity || 1),
-          amount: Number(s.recurringTotal || s.lines?.[0]?.lineTotal || 0),
+          amount: Number(s.recurringTotal || s.lines?.[0]?.lineTotal || s.lines?.[0]?.unitPrice || s.plan?.price || 0),
           billingFrequency: s.billingFrequency || 'MONTHLY',
           nextBillingAt: s.nextBillingAt,
           startAt: s.startAt,
         }));
       }
-      return mockAdminSubscriptions;
-    } catch {
-      return mockAdminSubscriptions;
+      return [];
+    } catch (err) {
+      console.error('Failed to load subscriptions from API:', err);
+      return [];
     }
+  },
+
+  async getSubscriptionById(id: string): Promise<any> {
+    const response = await api.get(`/subscriptions/${id}`);
+    return response.data?.data || response.data;
   },
 
   async pauseSubscription(id: string): Promise<boolean> {
@@ -137,12 +143,8 @@ export const subscriptionService = {
   },
 
   async generateInvoice(id: string): Promise<any> {
-    try {
-      const response = await api.post(`/subscriptions/${id}/generate-invoice`);
-      return response.data;
-    } catch {
-      return { success: true, message: 'Invoice generated successfully' };
-    }
+    const response = await api.post(`/subscriptions/${id}/generate-invoice`);
+    return response.data;
   },
 };
 

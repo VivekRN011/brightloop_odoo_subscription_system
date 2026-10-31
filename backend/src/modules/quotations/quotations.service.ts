@@ -66,29 +66,54 @@ export class QuotationsService {
   }
 
   static async getQuotationById(id: string) {
-    const quotation = await prisma.quotation.findUnique({
-      where: { id },
-      include: {
-        customer: true,
-        template: true,
-        createdBy: {
-          select: { id: true, email: true },
-        },
-        lines: {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id).trim());
+    const quotation = isUuid
+      ? await prisma.quotation.findUnique({
+          where: { id },
           include: {
-            product: true,
-            plan: true,
+            customer: true,
+            template: true,
+            createdBy: {
+              select: { id: true, email: true },
+            },
+            lines: {
+              include: {
+                product: true,
+                plan: true,
+              },
+            },
+            convertedSubscription: {
+              select: {
+                id: true,
+                subscriptionNumber: true,
+                status: true,
+              },
+            },
           },
-        },
-        convertedSubscription: {
-          select: {
-            id: true,
-            subscriptionNumber: true,
-            status: true,
+        })
+      : await prisma.quotation.findFirst({
+          where: { quotationNumber: id },
+          include: {
+            customer: true,
+            template: true,
+            createdBy: {
+              select: { id: true, email: true },
+            },
+            lines: {
+              include: {
+                product: true,
+                plan: true,
+              },
+            },
+            convertedSubscription: {
+              select: {
+                id: true,
+                subscriptionNumber: true,
+                status: true,
+              },
+            },
           },
-        },
-      },
-    });
+        });
 
     if (!quotation) {
       throw new Error("Quotation not found");

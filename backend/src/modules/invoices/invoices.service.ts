@@ -155,29 +155,37 @@ export class InvoicesService {
    * Get a single invoice by ID with all lines and allocations.
    */
   static async getInvoiceById(id: string, customerScopeId?: string) {
-    const invoice = await prisma.invoice.findUnique({
-      where: { id },
-      include: {
-        customer: {
-          include: {
-            user: {
-              select: { email: true },
-            },
-          },
-        },
-        subscription: true,
-        lines: {
-          include: {
-            product: true,
-          },
-        },
-        allocations: {
-          include: {
-            payment: true,
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id).trim());
+    const includeConfig = {
+      customer: {
+        include: {
+          user: {
+            select: { email: true },
           },
         },
       },
-    });
+      subscription: true,
+      lines: {
+        include: {
+          product: true,
+        },
+      },
+      allocations: {
+        include: {
+          payment: true,
+        },
+      },
+    };
+
+    const invoice = isUuid
+      ? await prisma.invoice.findUnique({
+          where: { id },
+          include: includeConfig,
+        })
+      : await prisma.invoice.findFirst({
+          where: { invoiceNumber: id },
+          include: includeConfig,
+        });
 
     if (!invoice) {
       throw new Error("Invoice not found");

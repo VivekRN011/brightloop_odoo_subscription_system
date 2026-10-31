@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { paymentService, type AdminPaymentItem } from '../services/payment.service';
+import { formatINR } from '@/lib/format';
 import { toast } from 'sonner';
 
 interface ExtendedPaymentRow extends AdminPaymentItem {
@@ -19,117 +20,31 @@ export const AdminPaymentsPage: React.FC = () => {
 
   // New Payment Form
   const [customerName, setCustomerName] = useState('');
-  const [invoiceId, setInvoiceId] = useState('INV-2026-1048');
-  const [amount, setAmount] = useState('283200');
+  const [invoiceId, setInvoiceId] = useState('');
+  const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<'UPI' | 'BANK_TRANSFER' | 'CARD' | 'CHEQUE' | 'CASH'>('UPI');
-  const [reference, setReference] = useState('UPI/629103948/HDFC');
-
-  const defaultPayments: ExtendedPaymentRow[] = [
-    {
-      id: 'pay-001',
-      paymentNumber: 'PAY-2026-1048',
-      customerName: 'Nexarise Technologies Pvt Ltd',
-      method: 'CARD',
-      railLabel: 'HDFC NACH e-Mandate (•••• 4921)',
-      amount: 283200,
-      paidAt: '2026-10-14T04:15:00Z',
-      clearanceDate: 'Oct 14, 2026, 04:15 IST',
-      invoiceRef: 'INV-2026-1048',
-      reference: 'NACH-9920148-HDFC',
-      status: 'RECORDED',
-      settlementStatus: 'RECONCILED',
-    },
-    {
-      id: 'pay-002',
-      paymentNumber: 'PAY-2026-1047',
-      customerName: 'Kore Technologies India',
-      method: 'BANK_TRANSFER',
-      railLabel: 'ICICI Bank NEFT Auto-reconciled',
-      amount: 100300,
-      paidAt: '2026-09-24T11:30:00Z',
-      clearanceDate: 'Sep 24, 2026, 11:30 IST',
-      invoiceRef: 'INV-2026-1047',
-      reference: 'NEFT/BARB26093817',
-      status: 'RECORDED',
-      settlementStatus: 'RECONCILED',
-    },
-    {
-      id: 'pay-003',
-      paymentNumber: 'PAY-2026-1046',
-      customerName: 'Almanac AI Systems',
-      method: 'UPI',
-      railLabel: 'UPI AutoPay (almanac@okhdfcbank)',
-      amount: 53100,
-      paidAt: '2026-10-12T09:00:00Z',
-      clearanceDate: 'Oct 12, 2026, 09:00 IST',
-      invoiceRef: 'INV-2026-1046',
-      reference: 'UPI/771829038/AXIS',
-      status: 'RECORDED',
-      settlementStatus: 'RECONCILED',
-    },
-    {
-      id: 'pay-004',
-      paymentNumber: 'PAY-2026-1045',
-      customerName: 'Zylos Health Tech',
-      method: 'CARD',
-      railLabel: 'Corporate Card e-Mandate (•••• 8812)',
-      amount: 37760,
-      paidAt: '2026-10-11T12:45:00Z',
-      clearanceDate: 'Oct 11, 2026, 12:45 IST',
-      invoiceRef: 'INV-2026-1045',
-      reference: 'TXN-CARD-99128',
-      status: 'RECORDED',
-      settlementStatus: 'RECONCILED',
-    },
-    {
-      id: 'pay-005',
-      paymentNumber: 'PAY-2026-1044',
-      customerName: 'Infiniti Logistics Pvt Ltd',
-      method: 'BANK_TRANSFER',
-      railLabel: 'Advance Client Deposit (RTGS)',
-      amount: 150000,
-      paidAt: '2026-10-08T15:20:00Z',
-      clearanceDate: 'Oct 08, 2026, 15:20 IST',
-      invoiceRef: 'Unallocated Deposit',
-      reference: 'RTGS/HDFC2600192',
-      status: 'RECORDED',
-      settlementStatus: 'UNALLOCATED',
-    },
-    {
-      id: 'pay-006',
-      paymentNumber: 'PAY-2026-1043',
-      customerName: 'UrbanCraft Retail Pvt Ltd',
-      method: 'CARD',
-      railLabel: 'NACH Debit Failed (Insufficient funds)',
-      amount: 84960,
-      paidAt: '2026-10-02T02:00:00Z',
-      clearanceDate: 'Retry 2 on Oct 06, 2026',
-      invoiceRef: 'INV-2026-1043',
-      reference: 'ERR-NACH-INSUFFICIENT',
-      status: 'FAILED',
-      settlementStatus: 'FAILED_RETRYING',
-    },
-  ];
+  const [reference, setReference] = useState('');
 
   const loadData = async () => {
     setLoading(true);
     try {
       const data = await paymentService.getPayments();
-      if (data && data.length > 0) {
+      if (Array.isArray(data)) {
         setPayments(
-          data.map((p, idx) => ({
+          data.map((p) => ({
             ...p,
-            invoiceRef: `INV-2026-104${8 - (idx % 6)}`,
-            clearanceDate: p.paidAt ? p.paidAt.slice(0, 10) : 'Oct 14, 2026',
-            railLabel: p.method === 'UPI' ? 'UPI AutoPay' : p.method === 'CARD' ? 'Corporate e-Mandate' : 'Direct Bank RTGS',
+            invoiceRef: (p as any).invoiceNumber || p.reference || '-',
+            clearanceDate: p.paidAt ? new Date(p.paidAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent',
+            railLabel: p.method === 'UPI' ? 'UPI AutoPay' : p.method === 'CARD' ? 'Corporate e-Mandate' : p.method === 'BANK_TRANSFER' ? 'Direct Bank RTGS' : p.method,
             settlementStatus: (p.status === 'FAILED' ? 'FAILED_RETRYING' : 'RECONCILED') as any,
           }))
         );
       } else {
-        setPayments(defaultPayments);
+        setPayments([]);
       }
-    } catch {
-      setPayments(defaultPayments);
+    } catch (err) {
+      console.error('Failed to load payments:', err);
+      setPayments([]);
     } finally {
       setLoading(false);
     }
@@ -144,32 +59,20 @@ export const AdminPaymentsPage: React.FC = () => {
     try {
       await paymentService.recordPayment({
         invoiceId,
-        customerId: 'cust-001',
+        customerId: customerName,
         amount: Number(amount),
         method,
-        reference,
+        reference: reference || `MANUAL-${Date.now()}`,
       });
-      toast.success(`Payment receipt for ₹${Number(amount).toLocaleString('en-IN')} recorded and reconciled!`);
+      toast.success(`Payment of ${formatINR(Number(amount))} recorded and reconciled successfully!`);
       setIsModalOpen(false);
+      setInvoiceId('');
+      setAmount('');
+      setReference('');
+      setCustomerName('');
       loadData();
-    } catch {
-      const newPay: ExtendedPaymentRow = {
-        id: `pay-${Date.now()}`,
-        paymentNumber: `PAY-2026-${Math.floor(1050 + Math.random() * 50)}`,
-        customerName: customerName || 'Corporate Client',
-        method,
-        railLabel: `${method} Manual Settlement`,
-        amount: Number(amount),
-        paidAt: new Date().toISOString(),
-        clearanceDate: 'Today, Just now',
-        invoiceRef: invoiceId,
-        reference,
-        status: 'RECORDED',
-        settlementStatus: 'RECONCILED',
-      };
-      setPayments((prev) => [newPay, ...prev]);
-      toast.success(`Payment of ₹${Number(amount).toLocaleString('en-IN')} recorded for ${invoiceId}.`);
-      setIsModalOpen(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to record payment');
     }
   };
 
@@ -235,14 +138,16 @@ export const AdminPaymentsPage: React.FC = () => {
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-on-surface-variant font-semibold">
-            <span>Settled This Month</span>
+            <span>Total Collected</span>
             <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-on-surface font-headline">₹1,12,55,000</span>
-            <span className="text-xs text-emerald-700 font-semibold ml-2">+14.2%</span>
+            <span className="text-2xl font-extrabold text-on-surface font-headline">
+              {formatINR(payments.filter((p) => p.status === 'RECORDED' || p.status === 'SUCCESS').reduce((sum, p) => sum + p.amount, 0))}
+            </span>
+            <span className="text-xs text-emerald-700 font-semibold ml-2">settled</span>
           </div>
-          <div className="text-[11px] text-on-surface-variant mt-2">321 automated recurring debits</div>
+          <div className="text-[11px] text-on-surface-variant mt-2">{payments.length} ledger transactions</div>
         </div>
 
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
@@ -251,31 +156,39 @@ export const AdminPaymentsPage: React.FC = () => {
             <span className="material-symbols-outlined text-emerald-600 text-lg">verified</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-primary font-headline">99.2%</span>
+            <span className="text-2xl font-extrabold text-primary font-headline">
+              {payments.length > 0
+                ? `${((payments.filter((p) => p.status === 'RECORDED' || p.status === 'SUCCESS').length / payments.length) * 100).toFixed(0)}%`
+                : '100%'}
+            </span>
           </div>
           <div className="text-[11px] text-emerald-700 mt-2 font-medium">Auto-matched with invoice ledger</div>
         </div>
 
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-on-surface-variant font-semibold">
-            <span>Unallocated Advances</span>
+            <span>Active Transactions</span>
             <span className="material-symbols-outlined text-primary text-lg">account_balance_wallet</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-on-surface font-headline">₹1,50,000</span>
+            <span className="text-2xl font-extrabold text-on-surface font-headline">
+              {payments.filter((p) => p.status === 'RECORDED').length}
+            </span>
           </div>
-          <div className="text-[11px] text-on-surface-variant mt-2">1 advance receipt awaiting next cycle</div>
+          <div className="text-[11px] text-on-surface-variant mt-2">Recorded &amp; confirmed collections</div>
         </div>
 
         <div className="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-on-surface-variant font-semibold">
-            <span>In Dunning / Retrying</span>
+            <span>Failed / Retrying</span>
             <span className="material-symbols-outlined text-error text-lg">warning</span>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-extrabold text-error font-headline">₹84,960</span>
+            <span className="text-2xl font-extrabold text-error font-headline">
+              {formatINR(payments.filter((p) => p.status === 'FAILED').reduce((sum, p) => sum + p.amount, 0))}
+            </span>
           </div>
-          <div className="text-[11px] text-error mt-2 font-medium">Smart retry cycle 2 active</div>
+          <div className="text-[11px] text-error mt-2 font-medium">{payments.filter((p) => p.status === 'FAILED').length} requires reconciliation retry</div>
         </div>
       </section>
 
