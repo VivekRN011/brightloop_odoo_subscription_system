@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Search,
   Play,
@@ -8,6 +9,7 @@ import {
   RefreshCw,
   Plus,
   CheckCircle2,
+  Eye,
 } from 'lucide-react';
 import {
   subscriptionService,
@@ -212,8 +214,10 @@ export const AdminSubscriptionsPage: React.FC = () => {
 
                   return (
                     <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                      <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100">
-                        {sub.subscriptionNumber}
+                      <td className="py-3 px-4 font-mono font-bold text-primary hover:underline">
+                        <Link to={`/app/subscriptions/${sub.subscriptionNumber}`}>
+                          {sub.subscriptionNumber}
+                        </Link>
                       </td>
                       <td className="py-3 px-4">
                         <div className="font-semibold text-slate-900 dark:text-slate-100">
@@ -250,6 +254,13 @@ export const AdminSubscriptionsPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <Link
+                            to={`/app/subscriptions/${sub.subscriptionNumber}`}
+                            title="View Subscription Details"
+                            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-600 transition-colors"
+                          >
+                            <Eye size={12} />
+                          </Link>
                           {sub.status === 'ACTIVE' && (
                             <>
                               <button

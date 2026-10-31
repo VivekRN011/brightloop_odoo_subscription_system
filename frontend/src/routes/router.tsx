@@ -1,9 +1,10 @@
-import { AdminSubscriptionsPage } from '@/features/subscriptions/pages/AdminSubscriptionsPage';
+import { AdminSubscriptionsPage, SubscriptionDetailPage, SubscriptionWorkflowPage } from '@/features/subscriptions';
 import { AdminInvoicesPage } from '@/features/invoices/pages/AdminInvoicesPage';
 import { AdminCustomersPage } from '@/features/customers/pages/AdminCustomersPage';
 import { AdminPaymentsPage } from '@/features/payments/pages/AdminPaymentsPage';
+import { AdminPlansPage } from '@/features/plans';
+import { AdminQuotationsPage } from '@/features/quotations';
 import { AdminProductsPage } from '@/features/products/pages/AdminProductsPage';
-import { AdminPlansPage } from '@/features/plans/pages/AdminPlansPage';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -24,7 +25,7 @@ import {
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 import { NotFoundPage } from './NotFoundPage';
 import { PortalLayout } from '@/features/portal/PortalLayout';
-import { SubscribeRouteGuard } from './SubscribeRouteGuard';
+
 
 export const router = createBrowserRouter([
   {
@@ -45,11 +46,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'subscribe',
-        element: <SubscribeRouteGuard />,
+        element: <SubscriptionWorkflowPage />,
       },
       {
         path: 'subscribe/:productId',
-        element: <SubscribeRouteGuard />,
+        element: <SubscriptionWorkflowPage />,
       },
     ],
   },
@@ -76,6 +77,10 @@ export const router = createBrowserRouter([
       {
         path: 'catalog',
         element: <CustomerCatalogPage />,
+      },
+      {
+        path: 'checkout',
+        element: <SubscriptionWorkflowPage />,
       },
       {
         path: 'subscriptions',
@@ -145,23 +150,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'quotations',
-        element: (
-          <PlaceholderPage
-            title="Quotations"
-            description="Prepare commercial subscription proposals from templates and convert accepted quotes into active subscriptions."
-            category="Subscriptions"
-            plannedFeatures={[
-              'Create quotations from reusable templates or scratch (PRD FR-QUOTE-04)',
-              'Associate quotation with customer and calculate validity expiry date',
-              'Automated tax and discount line calculations (FR-QUOTE-06)',
-              'One-click conversion into confirmed subscription upon acceptance (FR-QUOTE-07)',
-            ]}
-          />
-        ),
+        element: <AdminQuotationsPage />,
       },
       {
         path: 'subscriptions',
         element: <AdminSubscriptionsPage />,
+      },
+      {
+        path: 'subscriptions/:id',
+        element: <SubscriptionDetailPage />,
       },
       {
         path: 'invoices',
