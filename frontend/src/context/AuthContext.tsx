@@ -29,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initialize with persisted session if available, defaulting to Admin demo user for convenience
   const [user, setUser] = useState<User | null>(() => {
     const saved = authService.getSession();
-    return saved || DEMO_USERS.admin;
+    return saved || null;
   });
 
   useEffect(() => {

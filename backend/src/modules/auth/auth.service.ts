@@ -44,7 +44,7 @@ export class AuthService {
         data: {
           userId: user.id,
           customerCode,
-          displayName: input.displayName,
+          displayName: input.displayName || input.name || input.email.split("@")[0],
           companyName: input.companyName,
           phone: input.phone,
           billingAddressLine1: input.billingAddressLine1,
@@ -287,7 +287,7 @@ export class AuthService {
           action: "CREATE_STAFF_ACCOUNT",
           entityType: "User",
           entityId: user.id,
-          summary: `Admin created staff account for ${user.email} (${input.displayName})`,
+          summary: `Admin created staff account for ${user.email} (${input.displayName || input.name || "Staff"})`,
         },
       });
 

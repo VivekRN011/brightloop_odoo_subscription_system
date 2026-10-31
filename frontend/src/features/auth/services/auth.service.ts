@@ -10,53 +10,88 @@ export interface AuthSessionResponse {
 }
 
 const STORAGE_KEY = 'brightloop_auth_session';
+const TOKEN_KEY = 'brightloop_auth_token';
 
 /** Default approved demo identities for development and hackathon verification */
 export const DEMO_USERS: Record<string, User & { passwordHint: string }> = {
   admin: {
     id: 'usr-admin-01',
     name: 'Alex Morgan',
-    email: 'alex.morgan@brightloop.io',
+    email: 'admin@brightloop.io',
     role: 'ADMIN',
-    passwordHint: 'Admin@2026!',
+    passwordHint: 'Brightloop@2026',
   },
   staff: {
     id: 'usr-staff-01',
-    name: 'Ivin Raj',
-    email: 'staff.member@brightloop.io',
+    name: 'Staff Member',
+    email: 'staff@brightloop.io',
     role: 'STAFF',
-    passwordHint: 'Staff@2026!',
+    passwordHint: 'Brightloop@2026',
   },
   customer: {
     id: 'cust-apex-01',
-    name: 'Vikram Mehta',
-    email: 'billing@apexlogistics.in',
+    name: 'Sarah Chen',
+    email: 'sarah.chen@acme.inc',
     role: 'CUSTOMER',
-    companyName: 'Apex Logistics India',
-    passwordHint: 'Customer@2026!',
+    companyName: 'Acme Enterprises Inc.',
+    passwordHint: 'Brightloop@2026',
   },
 };
 
 export const authService = {
   /**
    * Attempts authentication via the backend API.
-   * Falls back gracefully to verified development accounts when backend is still being provisioned.
+   * Connects to /api/v1/auth/login and stores JWT session.
    */
   async login(credentials: LoginFormData): Promise<AuthSessionResponse> {
     try {
-      const response = await api.post<AuthSessionResponse>('/auth/login', {
+      const response = await api.post('/auth/login', {
         email: credentials.email,
         password: credentials.password,
       });
 
-      if (response.data && response.data.user) {
-        this.saveSession(response.data.user);
-        return response.data;
+      const resData = response.data;
+      const payload = resData.data || resData;
+      const rawUser = payload.user;
+      const token = payload.token;
+
+      if (rawUser) {
+        const sessionUser: User = {
+          id: rawUser.id,
+          name:
+            payload.customerProfile?.displayName ||
+            rawUser.name ||
+            rawUser.email.split('@')[0],
+          email: rawUser.email,
+          role: rawUser.role,
+          companyName: payload.customerProfile?.companyName || rawUser.companyName,
+        };
+
+        if (token) {
+          localStorage.setItem(TOKEN_KEY, token);
+        }
+        this.saveSession(sessionUser);
+
+        return {
+          success: true,
+          user: sessionUser,
+          token,
+          message: resData.message || 'Login successful',
+        };
       }
-    } catch {
-      // Backend not yet running auth endpoints or offline: check demo accounts
+    } catch (err: any) {
+      // If backend returned a clear validation/auth error response, surface it directly
+      if (err.response?.data?.message) {
+        throw new Error(err.response.data.message);
+      }
+
+      // If backend network is unavailable, check mock fallback
+      if (err.code !== 'ERR_NETWORK' && err.response) {
+        throw new Error('Authentication failed. Please check your credentials.');
+      }
     }
 
+    // Fallback: check seeded demo accounts locally if backend was completely unreachable
     const emailLower = credentials.email.trim().toLowerCase();
     const matched = Object.values(DEMO_USERS).find(
       (u) => u.email.toLowerCase() === emailLower
@@ -78,7 +113,6 @@ export const authService = {
       };
     }
 
-    // Check if user was registered locally in this browser session
     const registeredUsers = this.getStoredRegisteredUsers();
     const registeredMatch = registeredUsers.find((u) => u.email.toLowerCase() === emailLower);
     if (registeredMatch) {
@@ -94,45 +128,66 @@ export const authService = {
   },
 
   /**
-   * Registers a new customer account.
-   * Mandated by PRD.md Section 4: Public registration ALWAYS creates accounts with role CUSTOMER.
+   * Registers a new customer account via /api/v1/auth/register.
    */
   async register(data: RegisterFormData): Promise<AuthSessionResponse> {
-    const emailLower = data.email.trim().toLowerCase();
-
-    // Check email uniqueness across demo and registered accounts
-    const allUsers = [...Object.values(DEMO_USERS), ...this.getStoredRegisteredUsers()];
-    const exists = allUsers.some((u) => u.email.toLowerCase() === emailLower);
-    if (exists) {
-      throw new Error('This email address is already registered. Please sign in instead.');
-    }
-
     try {
-      const response = await api.post<AuthSessionResponse>('/auth/register', {
+      const response = await api.post('/auth/register', {
         name: data.name,
+        displayName: data.name,
         email: data.email,
         password: data.password,
         companyName: data.companyName,
-        role: 'CUSTOMER', // Explicitly enforced
+        role: 'CUSTOMER',
       });
 
-      if (response.data && response.data.user) {
-        this.saveSession(response.data.user);
-        return response.data;
+      const resData = response.data;
+      const payload = resData.data || resData;
+      const rawUser = payload.user;
+      const token = payload.token;
+
+      if (rawUser) {
+        const newCustomer: User = {
+          id: rawUser.id,
+          name:
+            payload.customerProfile?.displayName ||
+            data.name ||
+            rawUser.email.split('@')[0],
+          email: rawUser.email,
+          role: rawUser.role,
+          companyName: payload.customerProfile?.companyName || data.companyName,
+        };
+
+        if (token) {
+          localStorage.setItem(TOKEN_KEY, token);
+        }
+        this.saveSession(newCustomer);
+
+        return {
+          success: true,
+          user: newCustomer,
+          token,
+          message: resData.message || 'Account created successfully',
+        };
       }
-    } catch {
-      // Backend offline fallback
+    } catch (err: any) {
+      if (err.response?.data?.message) {
+        throw new Error(err.response.data.message);
+      }
+      if (err.code !== 'ERR_NETWORK' && err.response) {
+        throw new Error('Registration failed. Please check the provided information.');
+      }
     }
 
+    // Fallback if backend offline
     const newCustomer: User = {
       id: `cust-${Date.now()}`,
       name: data.name,
       email: data.email,
-      role: 'CUSTOMER' as UserRole, // Public registration strictly assigns CUSTOMER role
+      role: 'CUSTOMER' as UserRole,
       companyName: data.companyName,
     };
 
-    // Store in local storage to support immediate login
     this.saveRegisteredUser(newCustomer);
     this.saveSession(newCustomer);
 
@@ -142,6 +197,30 @@ export const authService = {
       token: `mock-jwt-token-customer-${Date.now()}`,
       message: 'Account created successfully',
     };
+  },
+
+  /**
+   * Fetch current session profile from backend /auth/me
+   */
+  async fetchMe(): Promise<User | null> {
+    try {
+      const response = await api.get('/auth/me');
+      const payload = response.data?.data || response.data;
+      if (payload && payload.id) {
+        const user: User = {
+          id: payload.id,
+          name: payload.customerProfile?.displayName || payload.email.split('@')[0],
+          email: payload.email,
+          role: payload.role,
+          companyName: payload.customerProfile?.companyName,
+        };
+        this.saveSession(user);
+        return user;
+      }
+    } catch {
+      // Return local session if offline
+    }
+    return this.getSession();
   },
 
   saveSession(user: User): void {
@@ -159,7 +238,7 @@ export const authService = {
         return JSON.parse(stored) as User;
       }
     } catch {
-      // Invalid JSON or storage unavailable
+      // Invalid JSON
     }
     return null;
   },
@@ -167,6 +246,8 @@ export const authService = {
   clearSession(): void {
     try {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+      api.post('/auth/logout').catch(() => {});
     } catch {
       // Storage unavailable
     }
@@ -192,4 +273,3 @@ export const authService = {
     }
   },
 };
-
