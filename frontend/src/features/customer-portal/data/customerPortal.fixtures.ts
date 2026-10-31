@@ -1,4 +1,27 @@
-import type { CustomerSummary } from '../models/customerPortal.types';
+import type { CustomerSummary, CustomerPayment } from '../models/customerPortal.types';
+
+export const mockPayments: CustomerPayment[] = [
+  {
+    id: 'pay-001',
+    paymentNumber: 'PAY-2026-0812',
+    invoiceNumber: 'INV-2026-0744',
+    amount: 45000,
+    paymentDate: '2026-10-02',
+    paymentMethod: 'BANK_TRANSFER',
+    referenceNote: 'NEFT Transfer UTR HDFCN262761890',
+    status: 'COMPLETED',
+  },
+  {
+    id: 'pay-002',
+    paymentNumber: 'PAY-2026-0604',
+    invoiceNumber: 'INV-2026-0612',
+    amount: 45000,
+    paymentDate: '2026-09-01',
+    paymentMethod: 'UPI',
+    referenceNote: 'UPI Reference 324109827612@icici',
+    status: 'COMPLETED',
+  },
+];
 
 export const mockCustomerSummary: CustomerSummary = {
   profile: {
@@ -68,6 +91,17 @@ export const mockCustomerSummary: CustomerSummary = {
       status: 'confirmed',
       isOverdue: false,
       planName: 'Dedicated Cloud Storage (1TB)',
+      lines: [
+        {
+          id: 'line-001',
+          description: 'Encrypted Cloud Storage License (1TB)',
+          quantity: 1,
+          unitPrice: 2966.10,
+          amount: 2966.10,
+          taxRate: 0.18,
+          taxAmount: 533.90,
+        },
+      ],
     },
     {
       id: 'inv-002',
@@ -80,6 +114,17 @@ export const mockCustomerSummary: CustomerSummary = {
       status: 'paid',
       isOverdue: false,
       planName: 'Enterprise Cloud ERP Plan',
+      lines: [
+        {
+          id: 'line-002',
+          description: 'Brightloop Enterprise Core - 25 User Licenses',
+          quantity: 25,
+          unitPrice: 1525.42,
+          amount: 38135.59,
+          taxRate: 0.18,
+          taxAmount: 6864.41,
+        },
+      ],
     },
     {
       id: 'inv-003',
@@ -92,6 +137,17 @@ export const mockCustomerSummary: CustomerSummary = {
       status: 'paid',
       isOverdue: false,
       planName: 'Enterprise Cloud ERP Plan',
+      lines: [
+        {
+          id: 'line-003',
+          description: 'Brightloop Enterprise Core - 25 User Licenses',
+          quantity: 25,
+          unitPrice: 1525.42,
+          amount: 38135.59,
+          taxRate: 0.18,
+          taxAmount: 6864.41,
+        },
+      ],
     },
   ],
   outstandingInvoices: [
@@ -108,6 +164,7 @@ export const mockCustomerSummary: CustomerSummary = {
       planName: 'Dedicated Cloud Storage (1TB)',
     },
   ],
+  payments: mockPayments,
 };
 
 /** Generates a fresh customer summary for a newly registered customer with 0 subscriptions */
@@ -131,5 +188,6 @@ export function getEmptyCustomerSummary(name: string, email: string, companyName
     subscriptions: [],
     recentInvoices: [],
     outstandingInvoices: [],
+    payments: [],
   };
 }

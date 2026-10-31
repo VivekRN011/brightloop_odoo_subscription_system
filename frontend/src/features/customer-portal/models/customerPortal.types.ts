@@ -17,6 +17,16 @@ export interface CustomerSubscription {
   nextBillingDate: string;
 }
 
+export interface CustomerInvoiceLine {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  taxRate: number; // e.g. 0.18
+  taxAmount: number;
+}
+
 export interface CustomerInvoice {
   id: string;
   invoiceNumber: string;
@@ -29,6 +39,20 @@ export interface CustomerInvoice {
   isOverdue: boolean;
   planName?: string;
   downloadUrl?: string;
+  lines?: CustomerInvoiceLine[];
+}
+
+export type PaymentMethodType = 'UPI' | 'BANK_TRANSFER' | 'CARD' | 'CHEQUE' | 'CASH';
+
+export interface CustomerPayment {
+  id: string;
+  paymentNumber: string;
+  invoiceNumber: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod: PaymentMethodType;
+  referenceNote: string;
+  status: 'COMPLETED' | 'CONFIRMED' | 'PENDING';
 }
 
 export interface CustomerProfile {
@@ -62,4 +86,5 @@ export interface CustomerSummary {
   subscriptions: CustomerSubscription[];
   recentInvoices: CustomerInvoice[];
   outstandingInvoices: CustomerInvoice[];
+  payments: CustomerPayment[];
 }
