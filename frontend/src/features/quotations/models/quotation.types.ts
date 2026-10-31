@@ -102,3 +102,4 @@ export interface CreateQuotationTemplateInput {
   validityDays: number;
   isActive?: boolean;
 }
+

@@ -38,3 +38,4 @@ export interface CreateDiscountRuleInput {
 }
 
 export type UpdateDiscountRuleInput = Partial<CreateDiscountRuleInput>;
+
