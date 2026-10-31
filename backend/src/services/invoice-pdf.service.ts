@@ -342,3 +342,4 @@ export class InvoicePdfService {
     doc.end();
   }
 }
+
