@@ -6,6 +6,7 @@ import {
   CreateQuotationTemplateInput,
 } from "./quotations.validation";
 import { Prisma, QuotationStatus, SubscriptionStatus, BillingFrequency } from "@prisma/client";
+import { SubscriptionsService } from "../subscriptions/subscriptions.service";
 
 export class QuotationsService {
   static async listQuotations(query: QuotationQueryInput) {
@@ -207,8 +208,15 @@ export class QuotationsService {
       throw new Error("Quotation not found");
     }
 
-    if (quotation.status === QuotationStatus.CONVERTED) {
-      throw new Error("This quotation has already been converted to a subscription.");
+    // Idempotent guard: if already converted, return the existing subscription safely
+    if (quotation.status === QuotationStatus.CONVERTED && quotation.convertedSubscriptionId) {
+      const existingSub = await prisma.subscription.findUnique({
+        where: { id: quotation.convertedSubscriptionId },
+        include: { lines: true },
+      });
+      if (existingSub) {
+        return existingSub;
+      }
     }
 
     // Find any line with a subscription plan
@@ -218,9 +226,8 @@ export class QuotationsService {
 
     const subscriptionNumber = generateSubscriptionNumber();
     const now = new Date();
-    // Default next billing date 1 month from now
-    const nextBilling = new Date(now);
-    nextBilling.setMonth(nextBilling.getMonth() + 1);
+    // Calculate calendar-accurate next billing date
+    const nextBilling = SubscriptionsService.calculateNextBillingDate(now, frequency, 1);
 
     return await prisma.$transaction(async (tx) => {
       const subscription = await tx.subscription.create({
@@ -264,7 +271,7 @@ export class QuotationsService {
           action: "CONVERT_QUOTATION_TO_SUBSCRIPTION",
           entityType: "Subscription",
           entityId: subscription.id,
-          summary: `Converted quotation ${quotation.quotationNumber} into subscription ${subscription.subscriptionNumber}`,
+          summary: `Converted quotation ${quotation.quotationNumber} to subscription ${subscription.subscriptionNumber}`,
         },
       });
 

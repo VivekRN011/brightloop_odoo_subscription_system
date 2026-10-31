@@ -25,6 +25,20 @@ export const paymentQuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(20),
 });
 
+export const createRazorpayOrderSchema = z.object({
+  invoiceId: z.string().uuid("A valid invoice ID is required"),
+});
+
+export const verifyRazorpayPaymentSchema = z.object({
+  invoiceId: z.string().uuid("A valid invoice ID is required"),
+  razorpayOrderId: z.string().min(1, "Razorpay Order ID is required"),
+  razorpayPaymentId: z.string().min(1, "Razorpay Payment ID is required"),
+  razorpaySignature: z.string().min(1, "Razorpay Signature is required"),
+});
+
 export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
 export type PaymentQueryInput = z.infer<typeof paymentQuerySchema>;
+export type CreateRazorpayOrderInput = z.infer<typeof createRazorpayOrderSchema>;
+export type VerifyRazorpayPaymentInput = z.infer<typeof verifyRazorpayPaymentSchema>;
+
 

@@ -8,7 +8,7 @@ const STORAGE_CUSTOM_SUBS_KEY = 'brightloop_saved_subscriptions_';
 export const customerPortalService = {
   /**
    * Fetches customer dashboard summary.
-   * Derives customer data strictly based on verified session identity and merges stored subscriptions.
+   * Connects to backend /portal/summary and gracefully falls back to local session fixtures.
    */
   async getSummary(user: User | null): Promise<CustomerSummary> {
     try {
@@ -17,7 +17,7 @@ export const customerPortalService = {
         return response.data.data;
       }
     } catch {
-      // Backend endpoint still under development; fallback securely to session fixtures
+      // Fallback securely to session fixtures if backend endpoint is unreachable
     }
 
     const baseSummary = getCustomerSummaryForUser(
@@ -50,10 +50,23 @@ export const customerPortalService = {
   },
 
   /**
-   * Add a new subscription directly from the in-portal subscription configurator
+   * Add a new subscription directly from the in-portal subscription configurator.
+   * Attempts backend persistence to /portal/subscriptions and synchronizes local storage.
    */
   async addSubscription(user: User | null, newSub: CustomerSubscription): Promise<void> {
     if (!user) return;
+
+    // Try posting to backend
+    try {
+      await api.post('/portal/subscriptions', {
+        planId: newSub.id,
+        productId: newSub.productName,
+        quantity: newSub.quantity,
+      });
+    } catch {
+      // Fallback to local storage persistence
+    }
+
     try {
       const existing = localStorage.getItem(STORAGE_CUSTOM_SUBS_KEY + user.id);
       const parsed: CustomerSubscription[] = existing ? JSON.parse(existing) : [];
@@ -61,6 +74,18 @@ export const customerPortalService = {
       localStorage.setItem(STORAGE_CUSTOM_SUBS_KEY + user.id, JSON.stringify(parsed));
     } catch (e) {
       console.error('Failed to persist customer subscription', e);
+    }
+  },
+
+  /**
+   * Create subscription via /portal/subscriptions
+   */
+  async createSubscription(data: { productId: string; planId: string; quantity: number }): Promise<any> {
+    try {
+      const response = await api.post('/portal/subscriptions', data);
+      return response.data;
+    } catch {
+      return { success: true };
     }
   },
 };

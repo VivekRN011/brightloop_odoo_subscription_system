@@ -7,15 +7,54 @@ import { UserRole } from "@prisma/client";
 import {
   recordPaymentSchema,
   paymentQuerySchema,
+  createRazorpayOrderSchema,
+  verifyRazorpayPaymentSchema,
 } from "./payments.validation";
 
 const router = Router();
 
-router.use(authenticate, requireRole(UserRole.ADMIN, UserRole.STAFF));
+// 1. Public Razorpay Webhook (Signature verified using raw body)
+router.post("/razorpay/webhook", PaymentsController.handleWebhook);
 
-router.get("/", validate({ query: paymentQuerySchema }), PaymentsController.list);
-router.get("/:id", PaymentsController.getById);
-router.post("/", validate({ body: recordPaymentSchema }), PaymentsController.record);
+// 2. Razorpay Checkout Endpoints (Open to authenticated Customers, Staff, and Admins)
+router.post(
+  "/razorpay/order",
+  authenticate,
+  validate({ body: createRazorpayOrderSchema }),
+  PaymentsController.createRazorpayOrder
+);
+
+router.post(
+  "/razorpay/verify",
+  authenticate,
+  validate({ body: verifyRazorpayPaymentSchema }),
+  PaymentsController.verifyRazorpayPayment
+);
+
+// 3. Admin & Staff Payment Management
+router.get(
+  "/",
+  authenticate,
+  requireRole(UserRole.ADMIN, UserRole.STAFF),
+  validate({ query: paymentQuerySchema }),
+  PaymentsController.list
+);
+
+router.get(
+  "/:id",
+  authenticate,
+  requireRole(UserRole.ADMIN, UserRole.STAFF),
+  PaymentsController.getById
+);
+
+router.post(
+  "/",
+  authenticate,
+  requireRole(UserRole.ADMIN, UserRole.STAFF),
+  validate({ body: recordPaymentSchema }),
+  PaymentsController.record
+);
 
 export default router;
+
 

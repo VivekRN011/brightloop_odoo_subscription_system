@@ -100,15 +100,74 @@ export class PaymentsService {
     const paymentNumber = generatePaymentNumber();
     const paidAt = input.paidAt ? new Date(input.paidAt) : new Date();
 
-    // Verify sum of allocations <= payment amount
-    const totalAllocated = input.allocations.reduce((sum, a) => sum + Number(a.amount), 0);
-    if (totalAllocated > Number(input.amount)) {
+    if (Number(input.amount) <= 0) {
+      throw new Error("Payment amount must be greater than zero");
+    }
+
+    const allocations = input.allocations || [];
+    const totalAllocated = allocations.reduce((sum, a) => sum + Number(a.amount), 0);
+    if (totalAllocated > Number(input.amount) + 0.001) {
       throw new Error(
         `Total allocated amount (${totalAllocated}) cannot exceed the payment amount (${input.amount})`
       );
     }
 
     return await prisma.$transaction(async (tx) => {
+      // 1. Validate customer existence and active status
+      const customer = await tx.customerProfile.findUnique({
+        where: { id: input.customerId },
+      });
+      if (!customer) {
+        throw new Error("Customer profile not found");
+      }
+
+      // 2. Validate all invoice allocations upfront
+      for (const alloc of allocations) {
+        if (Number(alloc.amount) <= 0) {
+          throw new Error("Allocation amount must be positive");
+        }
+
+        const inv = await tx.invoice.findUnique({
+          where: { id: alloc.invoiceId },
+          include: { allocations: true },
+        });
+
+        if (!inv) {
+          throw new Error(`Invoice with ID ${alloc.invoiceId} does not exist`);
+        }
+
+        if (inv.customerId !== input.customerId) {
+          throw new Error(
+            `Invoice ${inv.invoiceNumber} does not belong to customer ${customer.displayName}`
+          );
+        }
+
+        if (inv.currency !== input.currency) {
+          throw new Error(
+            `Currency mismatch: Invoice ${inv.invoiceNumber} is in ${inv.currency}, but payment is in ${input.currency}`
+          );
+        }
+
+        if (inv.status !== InvoiceStatus.CONFIRMED && inv.status !== InvoiceStatus.PAID) {
+          throw new Error(
+            `Invoice ${inv.invoiceNumber} is in ${inv.status} status and cannot receive allocations`
+          );
+        }
+
+        const alreadyAllocated = inv.allocations.reduce(
+          (sum, a) => sum + Number(a.allocatedAmount),
+          0
+        );
+        const remainingBalance = Math.round((Number(inv.grandTotal) - alreadyAllocated) * 100) / 100;
+
+        if (Number(alloc.amount) > remainingBalance + 0.001) {
+          throw new Error(
+            `Allocation amount (${alloc.amount}) exceeds remaining balance (${remainingBalance}) for invoice ${inv.invoiceNumber}`
+          );
+        }
+      }
+
+      // 3. Create the payment record with allocations
       const payment = await tx.payment.create({
         data: {
           paymentNumber,
@@ -121,7 +180,7 @@ export class PaymentsService {
           note: input.note,
           recordedById: actorUserId,
           allocations: {
-            create: input.allocations.map((a) => ({
+            create: allocations.map((a) => ({
               invoiceId: a.invoiceId,
               allocatedAmount: a.amount,
             })),
@@ -132,8 +191,8 @@ export class PaymentsService {
         },
       });
 
-      // Check each allocated invoice: if total allocations >= grandTotal, mark PAID
-      for (const alloc of input.allocations) {
+      // 4. Update status of each allocated invoice if fully settled
+      for (const alloc of allocations) {
         const inv = await tx.invoice.findUnique({
           where: { id: alloc.invoiceId },
           include: { allocations: true },
@@ -144,25 +203,29 @@ export class PaymentsService {
             (sum, a) => sum + Number(a.allocatedAmount),
             0
           );
-          if (totalPaidForInv >= Number(inv.grandTotal) && inv.status !== InvoiceStatus.PAID) {
+          if (
+            totalPaidForInv >= Number(inv.grandTotal) - 0.001 &&
+            inv.status !== InvoiceStatus.PAID
+          ) {
             await tx.invoice.update({
               where: { id: inv.id },
               data: {
                 status: InvoiceStatus.PAID,
-                paidAt: paidAt,
+                paidAt,
               },
             });
           }
         }
       }
 
+      // 5. Audit log
       await tx.auditLog.create({
         data: {
           actorUserId,
           action: "RECORD_PAYMENT",
           entityType: "Payment",
           entityId: payment.id,
-          summary: `Recorded payment ${payment.paymentNumber} of ${payment.currency} ${payment.amount} for customer ${payment.customerId}`,
+          summary: `Recorded payment ${payment.paymentNumber} of ${payment.currency} ${payment.amount} for customer ${customer.displayName}`,
         },
       });
 

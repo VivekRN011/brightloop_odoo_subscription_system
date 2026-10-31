@@ -19,22 +19,42 @@ export const validate = (schemas: ValidationSchemas) => {
         req.body = await schemas.body.parseAsync(req.body);
       }
       if (schemas.query) {
-        req.query = (await schemas.query.parseAsync(req.query)) as any;
+        const parsedQuery = (await schemas.query.parseAsync(req.query)) as any;
+        try {
+          Object.defineProperty(req, "query", {
+            value: parsedQuery,
+            writable: true,
+            configurable: true,
+            enumerable: true,
+          });
+        } catch {
+          Object.assign(req.query, parsedQuery);
+        }
       }
       if (schemas.params) {
-        req.params = (await schemas.params.parseAsync(req.params)) as any;
+        const parsedParams = (await schemas.params.parseAsync(req.params)) as any;
+        try {
+          Object.defineProperty(req, "params", {
+            value: parsedParams,
+            writable: true,
+            configurable: true,
+            enumerable: true,
+          });
+        } catch {
+          Object.assign(req.params, parsedParams);
+        }
       }
       next();
     } catch (error: any) {
-      if (error instanceof ZodError) {
-        const formattedErrors = error.issues.map((err) => ({
-          field: err.path.join("."),
+      if (error instanceof ZodError || error?.name === "ZodError") {
+        const formattedErrors = (error.issues || []).map((err: any) => ({
+          field: err.path?.join(".") || "unknown",
           message: err.message,
         }));
         sendError(res, "Validation failed", 400, formattedErrors);
         return;
       }
-      sendError(res, "Invalid request data", 400);
+      sendError(res, error?.message || "Invalid request data", 400);
     }
   };
 };

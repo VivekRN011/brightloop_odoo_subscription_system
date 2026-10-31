@@ -549,15 +549,16 @@
 
 /* ==========================================================================
    Authentication Pages (Login & Registration Split Screen)
-   Adapted from Vital Admin Design System
+   Adapted for Brightloop Cecillia Yo Editorial Design System
    ========================================================================== */
 
 .login-page {
   display: flex;
   min-height: 100vh;
   width: 100%;
-  background: var(--bl-bg);
-  color: var(--bl-foreground);
+  background: var(--color-background, #fff8f8);
+  color: var(--color-on-surface, #211a1c);
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
 }
 
 .login-page__left {
@@ -569,17 +570,18 @@
   padding: 40px 24px;
   min-height: 100vh;
   overflow-y: auto;
+  background: var(--color-background, #fff8f8);
 }
 
 .login-card {
   width: 100%;
   max-width: 480px;
   margin: auto 0;
-  padding: 32px;
-  background: var(--bl-surface);
-  border: 1px solid var(--bl-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-dropdown);
+  padding: 36px 32px;
+  background: var(--color-card-pure, #ffffff);
+  border: 1px solid var(--color-outline-variant, #d7c1c4);
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 20px -2px rgba(140, 75, 89, 0.05), 0 2px 6px -1px rgba(140, 75, 89, 0.03);
 }
 
 .login-page__right {
@@ -587,7 +589,7 @@
   position: relative;
   display: none;
   overflow: hidden;
-  background: linear-gradient(135deg, #1e3a8a 0%, #312e81 40%, #3730a3 100%);
+  background: #180e12;
   color: #ffffff;
 }
 
@@ -606,15 +608,15 @@
   flex-direction: column;
   justify-content: center;
   padding: 64px 48px;
-  gap: 20px;
+  gap: 24px;
 }
 
 .login-demo {
   margin-top: 24px;
   padding: 16px;
-  border-radius: var(--radius-md);
-  background: var(--bl-subtle);
-  border: 1px solid var(--bl-border);
+  border-radius: var(--radius-md, 12px);
+  background: var(--color-surface-container-low, #fff0f3);
+  border: 1px solid var(--color-outline-variant, #d7c1c4);
 }
 
 .login-demo__grid {
@@ -628,18 +630,18 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--bl-border);
-  background: var(--bl-surface);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--color-outline-variant, #d7c1c4);
+  background: var(--color-card-pure, #ffffff);
   text-align: left;
   cursor: pointer;
-  transition: all var(--trans-fast);
+  transition: all var(--trans-fast, 150ms ease);
 }
 
 .login-demo__btn:hover {
-  border-color: var(--bl-primary);
-  background: var(--bl-primary-subtle);
+  border-color: var(--color-primary, #743746);
+  background: var(--color-surface-container, #f9eaed);
 }
 
 .login-demo__role {
@@ -647,12 +649,12 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--bl-primary);
+  color: var(--color-primary, #743746);
 }
 
 .login-demo__email {
   font-size: 0.68rem;
-  color: var(--bl-muted-foreground);
+  color: var(--color-on-surface-variant, #524345);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
