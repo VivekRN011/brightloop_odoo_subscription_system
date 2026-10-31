@@ -29,7 +29,7 @@ export class PlansService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ billingFrequency: "asc" }, { price: "asc" }],
         include: {
           _count: {
             select: { subscriptions: true },
