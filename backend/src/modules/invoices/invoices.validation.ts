@@ -31,6 +31,16 @@ export const invoiceQuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(20),
 });
 
+export const generateInvoiceSchema = z.object({
+  issueDate: z.string().datetime().optional(),
+  dueDate: z.string().datetime().optional(),
+});
+
+export const cancelInvoiceSchema = z.object({
+  reason: z.string().max(500).optional(),
+});
+
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
 export type InvoiceQueryInput = z.infer<typeof invoiceQuerySchema>;
-
+export type GenerateInvoiceInput = z.infer<typeof generateInvoiceSchema>;
+export type CancelInvoiceInput = z.infer<typeof cancelInvoiceSchema>;

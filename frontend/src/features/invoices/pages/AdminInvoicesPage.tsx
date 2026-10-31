@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { api } from '@/services/api';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface InvoiceRow {
   id: string;
+  realId?: string;
   irn?: string;
   dunningBadge?: string;
   customer: string;
@@ -125,6 +127,79 @@ export const AdminInvoicesPage: React.FC = () => {
     },
   ]);
 
+  const loadLiveInvoices = async () => {
+    try {
+      const response = await api.get('/invoices');
+      const items = response.data?.data?.items || [];
+      if (Array.isArray(items) && items.length > 0) {
+        const mapped: InvoiceRow[] = items.map((inv: any) => ({
+          id: inv.invoiceNumber || inv.id,
+          realId: inv.id,
+          customer: inv.customer?.companyName || inv.customer?.displayName || 'Corporate Account',
+          gstin: `Code: ${inv.customer?.customerCode || 'CUST'}`,
+          subRef: inv.subscription?.subscriptionNumber || 'Direct Billing',
+          invoiceDate: new Date(inv.issueDate).toLocaleDateString(),
+          dueDate: `Due ${new Date(inv.dueDate).toLocaleDateString()}`,
+          taxable: `₹${Number(inv.subtotal).toLocaleString('en-IN')}`,
+          gst: `+₹${Number(inv.taxTotal).toLocaleString('en-IN')} GST`,
+          total: `₹${Number(inv.grandTotal).toLocaleString('en-IN')}`,
+          outstanding: `₹${Number(inv.outstandingAmount).toLocaleString('en-IN')}`,
+          status:
+            inv.status === 'PAID'
+              ? 'PAID'
+              : inv.outstandingAmount > 0 && new Date(inv.dueDate) < new Date()
+              ? 'OVERDUE'
+              : inv.status === 'DRAFT'
+              ? 'DRAFT'
+              : 'PENDING',
+        }));
+        setInvoices(mapped);
+      }
+    } catch {
+      // Keep initial fixtures
+    }
+  };
+
+  useEffect(() => {
+    loadLiveInvoices();
+  }, []);
+
+  const handleBatchGenerateInvoices = async () => {
+    try {
+      toast.info('Running automated billing batch across due subscriptions...');
+      const response = await api.post('/invoices/run-billing');
+      const data = response.data?.data;
+      toast.success(
+        `Batch Run ${data.runKey} finished: ${data.succeededCount} invoiced, ${data.skippedCount} skipped, ${data.failedCount} failed!`
+      );
+      loadLiveInvoices();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to execute billing run');
+    }
+  };
+
+  const handleDownloadPdf = async (inv: InvoiceRow) => {
+    try {
+      const targetId = inv.realId || inv.id;
+      toast.info(`Generating official PDF for ${inv.id}...`);
+      const response = await api.get(`/invoices/${targetId}/pdf`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `Invoice-${inv.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success(`Invoice ${inv.id} PDF downloaded!`);
+    } catch {
+      toast.error('Failed to download invoice PDF.');
+    }
+  };
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedIds(filtered.map((i) => i.id));
@@ -207,7 +282,7 @@ export const AdminInvoicesPage: React.FC = () => {
           </button>
 
           <button
-            onClick={() => toast.success('Batch generation complete: 4 recurring cycles processed for today.')}
+            onClick={handleBatchGenerateInvoices}
             className="px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-on-primary hover:bg-primary-container transition-all shadow-sm flex items-center gap-1.5 active:scale-95"
           >
             <span className="material-symbols-outlined text-base fill">bolt</span>
@@ -531,7 +606,7 @@ export const AdminInvoicesPage: React.FC = () => {
                   <td className="py-3.5 px-4 text-center">
                     <div className="inline-flex items-center gap-1.5">
                       <button
-                        onClick={() => toast.success(`Generated official Tax Invoice PDF for ${inv.id}`)}
+                        onClick={() => handleDownloadPdf(inv)}
                         className="p-1 rounded text-outline hover:text-primary hover:bg-surface-container transition-colors"
                         title="Download PDF"
                       >

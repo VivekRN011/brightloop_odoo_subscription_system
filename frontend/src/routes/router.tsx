@@ -3,7 +3,8 @@ import { AdminInvoicesPage } from '@/features/invoices/pages/AdminInvoicesPage';
 import { AdminCustomersPage } from '@/features/customers/pages/AdminCustomersPage';
 import { AdminPaymentsPage } from '@/features/payments/pages/AdminPaymentsPage';
 import { AdminPlansPage } from '@/features/plans';
-import { AdminQuotationsPage } from '@/features/quotations';
+import { AdminQuotationsPage, AdminQuotationTemplatesPage } from '@/features/quotations';
+import { AdminDiscountsPage } from '@/features/discounts';
 import { AdminProductsPage } from '@/features/products/pages/AdminProductsPage';
 import { AdminTaxesPage } from '@/features/settings/pages/AdminTaxesPage';
 import { AdminStaffPage } from '@/features/settings/pages/AdminStaffPage';
@@ -28,7 +29,6 @@ import {
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 import { NotFoundPage } from './NotFoundPage';
 import { PortalLayout } from '@/features/portal/PortalLayout';
-
 
 export const router = createBrowserRouter([
   {
@@ -137,19 +137,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'quotation-templates',
-        element: (
-          <PlaceholderPage
-            title="Quotation Templates"
-            description="Configure reusable commercial templates with pre-defined plans, products, and validity durations."
-            category="Subscriptions"
-            plannedFeatures={[
-              'Create reusable quotation templates (PRD FR-QUOTE-01)',
-              'Pre-populate product lines, subscription plans, and quantities (FR-QUOTE-02)',
-              'Configurable validity period in days (FR-QUOTE-03)',
-              'Template versioning and activation status',
-            ]}
-          />
-        ),
+        element: <AdminQuotationTemplatesPage />,
       },
       {
         path: 'quotations',
@@ -177,22 +165,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'discounts',
-        element: (
-          <PlaceholderPage
-            title="Discounts & Promotions"
-            description="Manage promotional coupons, partner discount codes, and customer-specific concessions."
-            category="Business Management"
-            adminOnly={true}
-            plannedFeatures={[
-              'Admin-only rule configuration (PRD FR-DISC-01, Table 4.4)',
-              'Fixed amount and percentage discount types (FR-DISC-02)',
-              'Minimum purchase amount or quantity thresholds (FR-DISC-03)',
-              'Start/end validity dates and maximum usage limits (FR-DISC-04/05)',
-              'Product-level vs subscription-level applicability (FR-DISC-06)',
-              'Automatic application to next recurring invoice run (FR-DISC-07)',
-            ]}
-          />
-        ),
+        element: <AdminDiscountsPage />,
       },
       {
         path: 'reports',
