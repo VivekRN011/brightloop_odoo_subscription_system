@@ -5,11 +5,15 @@ import {
   CheckCircle2,
   ArrowRight,
   ArrowLeft,
+  AlertTriangle,
+  Loader2,
+  CreditCard,
 } from 'lucide-react';
 import { useProducts } from '@/features/products/hooks/useProducts';
 import { usePlans } from '@/features/plans/hooks/usePlans';
 import { useAuth } from '@/context/AuthContext';
-import { customerPortalService } from '../services/customerPortal.service';
+import { api } from '@/services/api';
+import { launchRazorpayCheckout } from '../services/razorpayClient.service';
 import type { CustomerSubscription } from '../models/customerPortal.types';
 import { formatINR } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -36,19 +40,21 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
   const [step, setStep] = useState<number>(1);
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
-  const [selectedPlanCode, setSelectedPlanCode] = useState<string>('PLAN-BIZ-M');
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [discountCode, setDiscountCode] = useState<string>('');
   const [appliedDiscountPct, setAppliedDiscountPct] = useState<number>(0);
   const [discountError, setDiscountError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [verifiedPaymentId, setVerifiedPaymentId] = useState<string | null>(null);
   const [createdSubscription, setCreatedSubscription] = useState<CustomerSubscription | null>(null);
 
   // Initialize selections when modal opens or initialProductId changes
   useEffect(() => {
     if (isOpen && products.length > 0) {
       const prod = initialProductId
-        ? products.find((p) => p.id === initialProductId) || products[0]
+        ? products.find((p) => p.id === initialProductId || p.sku === initialProductId) || products[0]
         : products[0];
 
       setSelectedProductId(prod.id);
@@ -58,16 +64,19 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
         setSelectedVariantId('');
       }
 
-      if (initialPlanCode && plans.some((pl) => pl.code === initialPlanCode)) {
-        setSelectedPlanCode(initialPlanCode);
-      } else {
-        setSelectedPlanCode('PLAN-BIZ-M');
+      if (plans.length > 0) {
+        const matchedPlan = initialPlanCode
+          ? plans.find((pl) => pl.code === initialPlanCode || pl.id === initialPlanCode) || plans[0]
+          : plans[0];
+        setSelectedPlanId(matchedPlan.id);
       }
 
       setStep(1);
       setQuantity(1);
       setAppliedDiscountPct(0);
       setDiscountError(null);
+      setPaymentError(null);
+      setVerifiedPaymentId(null);
       setCreatedSubscription(null);
     }
   }, [isOpen, initialProductId, initialPlanCode, products, plans]);
@@ -76,7 +85,7 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
 
   const activeProduct = products.find((p) => p.id === selectedProductId) || products[0];
   const activeVariant = activeProduct?.variants.find((v) => v.id === selectedVariantId);
-  const activePlan = plans.find((p) => p.code === selectedPlanCode) || plans[0];
+  const activePlan = plans.find((p) => p.id === selectedPlanId || p.code === selectedPlanId) || plans[0];
 
   const basePrice = activeProduct?.salesPrice || 0;
   const variantAdj = activeVariant?.priceAdjustment || 0;
@@ -100,36 +109,71 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
   };
 
   const handleConfirmSubscription = async () => {
+    if (!activeProduct || !activePlan) return;
     setIsSubmitting(true);
-    setTimeout(async () => {
-      const subSeq = `SUB-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      const now = new Date();
-      const nextMonth = new Date(now);
-      nextMonth.setMonth(nextMonth.getMonth() + 1);
-      const nextYear = new Date(now);
-      nextYear.setFullYear(nextYear.getFullYear() + 1);
+    setPaymentError(null);
 
-      const newSub: CustomerSubscription = {
-        id: `sub-custom-${Date.now()}`,
-        subscriptionNumber: subSeq,
-        planName: activePlan?.name || 'Business Pro Plan',
-        productName: activeProduct?.name || 'Brightloop Software Service',
-        status: 'active',
-        quantity: quantity,
-        billingInterval: activePlan?.billingFrequency || 'MONTHLY',
-        price: grandTotal,
-        currency: 'INR',
-        startDate: now.toISOString().split('T')[0],
-        expiryDate: nextYear.toISOString().split('T')[0],
-        nextBillingDate: nextMonth.toISOString().split('T')[0],
-      };
+    try {
+      // 1. Create subscription & initial invoice on backend
+      const res = await api.post('/portal/subscriptions', {
+        productId: activeProduct.id,
+        planId: activePlan.id,
+        variantId: activeVariant?.id || undefined,
+        quantity,
+      });
 
-      await customerPortalService.addSubscription(user, newSub);
-      queryClient.invalidateQueries({ queryKey: ['portal', 'summary'] });
+      const responseData = res.data?.data;
+      const sub = responseData?.sub || responseData?.subscription || responseData;
+      const invoice = responseData?.invoice;
+
+      if (!invoice || !invoice.id) {
+        throw new Error('Initial invoice could not be generated for this subscription.');
+      }
+
+      // 2. Open Razorpay Checkout modal immediately for the generated invoice
+      await launchRazorpayCheckout({
+        invoiceId: invoice.id,
+        onSuccess: (result) => {
+          setIsSubmitting(false);
+          setCreatedSubscription({
+            id: sub.id,
+            subscriptionNumber: sub.subscriptionNumber,
+            planName: activePlan.name,
+            productName: activeProduct.name,
+            status: 'active',
+            quantity,
+            billingInterval: activePlan.billingFrequency,
+            price: Number(invoice.grandTotal),
+            currency: 'INR',
+            startDate: new Date().toISOString(),
+            expiryDate: '',
+            nextBillingDate: sub.nextBillingAt,
+          });
+          setVerifiedPaymentId(
+            result.payment?.gatewayPaymentId || result.payment?.reference || 'Verified'
+          );
+          queryClient.invalidateQueries({ queryKey: ['portal'] });
+          setStep(3); // Success step
+        },
+        onError: (err) => {
+          setIsSubmitting(false);
+          setPaymentError(err);
+          queryClient.invalidateQueries({ queryKey: ['portal'] });
+        },
+        onDismiss: () => {
+          setIsSubmitting(false);
+          setPaymentError(
+            `Razorpay checkout was dismissed. Invoice ${invoice.invoiceNumber} has been generated and is awaiting payment in your Invoices tab.`
+          );
+          queryClient.invalidateQueries({ queryKey: ['portal'] });
+        },
+      });
+    } catch (err: any) {
       setIsSubmitting(false);
-      setCreatedSubscription(newSub);
-      setStep(3); // Success step
-    }, 1000);
+      setPaymentError(
+        err.response?.data?.message || err.message || 'Failed to initialize subscription checkout.'
+      );
+    }
   };
 
   return (
@@ -250,12 +294,12 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
                     3. Billing Cadence
                   </label>
                   <select
-                    value={selectedPlanCode}
-                    onChange={(e) => setSelectedPlanCode(e.target.value)}
+                    value={selectedPlanId}
+                    onChange={(e) => setSelectedPlanId(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
                   >
                     {plans.map((pl) => (
-                      <option key={pl.code} value={pl.code}>
+                      <option key={pl.id} value={pl.id}>
                         {pl.name} ({pl.billingFrequency}) — {formatINR(pl.price)}
                       </option>
                     ))}
@@ -303,6 +347,13 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
 
           {step === 2 && (
             <div className="space-y-6">
+              {paymentError && (
+                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2.5">
+                  <AlertTriangle size={16} className="shrink-0" />
+                  <span>{paymentError}</span>
+                </div>
+              )}
+
               {/* Review Breakdown */}
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
@@ -384,9 +435,19 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
                 <Button
                   onClick={handleConfirmSubscription}
                   disabled={isSubmitting}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-6 shadow-xs"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-6 shadow-xs flex items-center gap-1.5"
                 >
-                  {isSubmitting ? 'Activating Subscription...' : 'Confirm & Activate Subscription'}
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Opening Razorpay Gateway...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard size={14} />
+                      <span>Confirm &amp; Pay with Razorpay</span>
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -399,11 +460,16 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
               </div>
               <div>
                 <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                  Subscription Successfully Activated!
+                  Payment Verified &amp; Subscription Live!
                 </h4>
                 <p className="text-xs text-slate-500 mt-1">
-                  Reference code <strong className="font-mono text-slate-800 dark:text-slate-200">{createdSubscription.subscriptionNumber}</strong> has been added to your account.
+                  Subscription <strong className="font-mono text-slate-800 dark:text-slate-200">{createdSubscription.subscriptionNumber}</strong> has been confirmed and activated.
                 </p>
+                {verifiedPaymentId && (
+                  <p className="text-[11px] text-emerald-600 font-mono mt-1 font-semibold">
+                    Razorpay Reference: {verifiedPaymentId}
+                  </p>
+                )}
               </div>
 
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 max-w-sm mx-auto text-xs space-y-1.5 text-left">
@@ -416,8 +482,14 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
                   <span className="capitalize">{createdSubscription.billingInterval.toLowerCase()}</span>
                 </div>
                 <div className="flex justify-between text-slate-500">
-                  <span>Rate:</span>
-                  <span className="font-bold text-indigo-600 dark:text-indigo-400">{formatINR(createdSubscription.price)}</span>
+                  <span>Amount Settled:</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatINR(createdSubscription.price)} (PAID)</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Status:</span>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    Active
+                  </span>
                 </div>
               </div>
 

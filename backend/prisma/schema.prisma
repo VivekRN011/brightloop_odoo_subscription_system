@@ -507,9 +507,13 @@ model Payment {
   amount        Decimal       @db.Decimal(14, 2)
   currency      String        @default("INR") @db.Char(3)
   paidAt        DateTime      @db.Timestamptz(6)
-  reference     String?       @db.VarChar(120)
-  note          String?       @db.Text
-  recordedById  String        @db.Uuid
+  reference                  String?   @db.VarChar(120)
+  note                       String?   @db.Text
+  gatewayProvider            String?   @db.VarChar(40)
+  gatewayOrderId             String?   @unique @db.VarChar(100)
+  gatewayPaymentId           String?   @unique @db.VarChar(100)
+  gatewaySignatureVerifiedAt DateTime? @db.Timestamptz(6)
+  recordedById               String    @db.Uuid
   createdAt     DateTime      @default(now()) @db.Timestamptz(6)
   updatedAt     DateTime      @updatedAt @db.Timestamptz(6)
 
@@ -599,4 +603,17 @@ model AuditLog {
   @@index([entityType, entityId, createdAt])
   @@index([actorUserId, createdAt])
   @@map("audit_logs")
+}
+
+// 22. PaymentGatewayEvent
+model PaymentGatewayEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  eventId     String   @unique @db.VarChar(100)
+  provider    String   @default("RAZORPAY") @db.VarChar(40)
+  eventType   String   @db.VarChar(100)
+  payload     Json
+  processedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([provider, eventType])
+  @@map("payment_gateway_events")
 }

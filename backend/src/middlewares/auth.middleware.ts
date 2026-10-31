@@ -71,3 +71,50 @@ export const authenticate = async (
   }
 };
 
+/**
+ * Optional authentication middleware:
+ * Populates req.user if a valid token is provided, but allows unauthenticated requests to proceed.
+ */
+export const optionalAuthenticate = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    let token: string | undefined;
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1];
+    } else if (req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    }
+
+    if (!token) {
+      return next();
+    }
+
+    const payload = verifyToken(token);
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      include: {
+        customerProfile: { select: { id: true } },
+      },
+    });
+
+    if (user && user.status === UserStatus.ACTIVE) {
+      req.user = {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        customerProfileId: user.customerProfile?.id,
+      };
+    }
+    next();
+  } catch {
+    next();
+  }
+};
+
+
