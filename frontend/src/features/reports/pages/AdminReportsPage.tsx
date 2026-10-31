@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import { reportsService, RevenueMonth, PlanSummary } from '../services/reports.service';
+import { reportsService, type RevenueMonth, type PlanSummary } from '../services/reports.service';
 import { formatINR } from '@/lib/format';
 
 const mockRevenueTimeline: RevenueMonth[] = [
