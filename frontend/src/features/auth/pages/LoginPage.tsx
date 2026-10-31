@@ -49,8 +49,8 @@ export const LoginPage: React.FC = () => {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'alex.morgan@brightloop.io',
-      password: '••••••••••••',
+      email: 'admin@brightloop.io',
+      password: 'Brightloop@2026',
       remember: true,
     },
   });

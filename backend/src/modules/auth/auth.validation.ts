@@ -16,7 +16,8 @@ export const registerSchema = z.object({
     .email("Invalid email address")
     .transform((val) => val.trim().toLowerCase()),
   password: passwordSchema,
-  displayName: z.string().min(1, "Display name is required"),
+  displayName: z.string().optional(),
+  name: z.string().optional(),
   companyName: z.string().optional(),
   phone: z.string().optional(),
   billingAddressLine1: z.string().optional(),
@@ -26,6 +27,7 @@ export const registerSchema = z.object({
   postalCode: z.string().optional(),
   country: z.string().optional(),
   taxIdentifier: z.string().optional(),
+  role: z.string().optional(),
 });
 
 export const loginSchema = z.object({
@@ -34,6 +36,7 @@ export const loginSchema = z.object({
     .email("Invalid email address")
     .transform((val) => val.trim().toLowerCase()),
   password: z.string().min(1, "Password is required"),
+  remember: z.boolean().optional(),
 });
 
 export const forgotPasswordSchema = z.object({
@@ -54,7 +57,8 @@ export const createStaffSchema = z.object({
     .email("Invalid email address")
     .transform((val) => val.trim().toLowerCase()),
   password: passwordSchema,
-  displayName: z.string().min(1, "Staff name is required"),
+  displayName: z.string().optional(),
+  name: z.string().optional(),
   phone: z.string().optional(),
 });
 
@@ -63,4 +67,3 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type CreateStaffInput = z.infer<typeof createStaffSchema>;
-
