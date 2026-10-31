@@ -1,8 +1,13 @@
 export { CustomerDashboardPage } from './pages/CustomerDashboardPage';
+export { CustomerCatalogPage } from './pages/CustomerCatalogPage';
 export { CustomerSubscriptionsPage } from './pages/CustomerSubscriptionsPage';
+export { CustomerSubscriptionDetailPage } from './pages/CustomerSubscriptionDetailPage';
 export { CustomerInvoicesPage } from './pages/CustomerInvoicesPage';
+export { CustomerInvoiceDetailPage } from './pages/CustomerInvoiceDetailPage';
+export { CustomerPaymentsPage } from './pages/CustomerPaymentsPage';
 export { CustomerProfilePage } from './pages/CustomerProfilePage';
+export { InPortalSubscribeModal } from './components/InPortalSubscribeModal';
 export * from './models/customerPortal.types';
 export * from './services/customerPortal.service';
 export * from './hooks/useCustomerPortal';
-
+export * from './data/customerPortal.fixtures';

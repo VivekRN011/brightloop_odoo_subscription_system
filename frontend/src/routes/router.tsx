@@ -1,22 +1,51 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { PublicLayout } from '@/components/layout/PublicLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { LoginPage, RegisterPage, ResetPasswordPage } from '@/features/auth';
+import { HomePage } from '@/features/public';
+import { ProductListPage, ProductDetailsPage } from '@/features/products';
 import {
   CustomerDashboardPage,
+  CustomerCatalogPage,
   CustomerSubscriptionsPage,
+  CustomerSubscriptionDetailPage,
   CustomerInvoicesPage,
+  CustomerInvoiceDetailPage,
+  CustomerPaymentsPage,
   CustomerProfilePage,
 } from '@/features/customer-portal';
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 import { NotFoundPage } from './NotFoundPage';
 import { PortalLayout } from '@/features/portal/PortalLayout';
-import { RootRedirect } from './RootRedirect';
+import { SubscribeRouteGuard } from './SubscribeRouteGuard';
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <RootRedirect />,
+    element: <PublicLayout />,
+    children: [
+      {
+        index: true,
+        element: <HomePage />,
+      },
+      {
+        path: 'products',
+        element: <ProductListPage />,
+      },
+      {
+        path: 'products/:id',
+        element: <ProductDetailsPage />,
+      },
+      {
+        path: 'subscribe',
+        element: <SubscribeRouteGuard />,
+      },
+      {
+        path: 'subscribe/:productId',
+        element: <SubscribeRouteGuard />,
+      },
+    ],
   },
   {
     path: '/login',
@@ -39,12 +68,28 @@ export const router = createBrowserRouter([
         element: <CustomerDashboardPage />,
       },
       {
+        path: 'catalog',
+        element: <CustomerCatalogPage />,
+      },
+      {
         path: 'subscriptions',
         element: <CustomerSubscriptionsPage />,
       },
       {
+        path: 'subscriptions/:id',
+        element: <CustomerSubscriptionDetailPage />,
+      },
+      {
         path: 'invoices',
         element: <CustomerInvoicesPage />,
+      },
+      {
+        path: 'invoices/:id',
+        element: <CustomerInvoiceDetailPage />,
+      },
+      {
+        path: 'payments',
+        element: <CustomerPaymentsPage />,
       },
       {
         path: 'profile',
