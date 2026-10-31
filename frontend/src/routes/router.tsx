@@ -6,6 +6,9 @@ import { AdminPlansPage } from '@/features/plans';
 import { AdminQuotationsPage, AdminQuotationTemplatesPage } from '@/features/quotations';
 import { AdminDiscountsPage } from '@/features/discounts';
 import { AdminProductsPage } from '@/features/products/pages/AdminProductsPage';
+import { AdminTaxesPage } from '@/features/settings/pages/AdminTaxesPage';
+import { AdminStaffPage } from '@/features/settings/pages/AdminStaffPage';
+import { AdminReportsPage } from '@/features/reports/pages/AdminReportsPage';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -166,19 +169,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'reports',
-        element: (
-          <PlaceholderPage
-            title="Reports & Analytics"
-            description="Financial metrics, recurring revenue analytics, customer churn, and tax reports."
-            category="Business Management"
-            plannedFeatures={[
-              'Monthly Recurring Revenue (MRR) and Annual Recurring Revenue (ARR)',
-              'Active subscriptions, revenue received, and outstanding trends (PRD FR-AN-01 to 04)',
-              'Customer retention and churn cohort breakdown',
-              'GST liability tax reports and CSV export capability',
-            ]}
-          />
-        ),
+        element: <AdminReportsPage />,
       },
       {
         path: 'settings',
@@ -198,37 +189,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'settings/staff',
-        element: (
-          <PlaceholderPage
-            title="Staff Management"
-            description="Admin-only team user management, role assignments, and access privileges."
-            category="Configuration"
-            adminOnly={true}
-            plannedFeatures={[
-              'Only Admin can create staff accounts (PRD FR-AUTH-08, BR-03, Table 4.4)',
-              'Staff accounts with granular operational permissions',
-              'Activity audit trail by staff member',
-              'Account suspension and password reset triggers',
-            ]}
-          />
-        ),
+        element: <AdminStaffPage />,
       },
       {
         path: 'settings/taxes',
-        element: (
-          <PlaceholderPage
-            title="Tax Settings"
-            description="Configure Indian GST tax slabs, HSN/SAC codes, and inter-state tax rules."
-            category="Configuration"
-            adminOnly={true}
-            plannedFeatures={[
-              'Admin-only tax rule configuration (PRD FR-TAX-01, Table 4.4)',
-              'Standard GST rates (5%, 12%, 18%, 28%) and zero-rated items',
-              'Automatic CGST + SGST vs IGST calculation based on place of supply',
-              'HSN/SAC service classification code mapping',
-            ]}
-          />
-        ),
+        element: <AdminTaxesPage />,
       },
     ],
   },
