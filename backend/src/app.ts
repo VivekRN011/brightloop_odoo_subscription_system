@@ -2,7 +2,10 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import cookieParser from "cookie-parser";
 import { prisma } from "./config/prisma";
+import authRoutes from "./modules/auth/auth.routes";
+import { errorHandler } from "./middlewares/error.middleware";
 
 const app = express();
 
@@ -13,6 +16,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
@@ -35,5 +39,10 @@ app.get("/api/v1/health", async (_req, res) => {
   }
 });
 
-export default app;
+// Domain routes
+app.use("/api/v1/auth", authRoutes);
 
+// Central error handler
+app.use(errorHandler);
+
+export default app;
