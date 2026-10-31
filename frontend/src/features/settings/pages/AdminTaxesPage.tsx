@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import { taxesService, TaxRule } from '../services/taxes.service';
+import { taxesService, type TaxRule } from '../services/taxes.service';
 import { formatDate } from '@/lib/format';
 
 const mockTaxRules: TaxRule[] = [
