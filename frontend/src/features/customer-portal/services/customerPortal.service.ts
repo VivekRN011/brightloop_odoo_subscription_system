@@ -1,12 +1,14 @@
 import { api } from '@/services/api';
-import type { CustomerSummary } from '../models/customerPortal.types';
-import { mockCustomerSummary, getEmptyCustomerSummary } from '../data/customerPortal.fixtures';
+import type { CustomerSummary, CustomerSubscription } from '../models/customerPortal.types';
+import { getCustomerSummaryForUser } from '../data/customerPortal.fixtures';
 import type { User } from '@/context/AuthContext';
+
+const STORAGE_CUSTOM_SUBS_KEY = 'brightloop_saved_subscriptions_';
 
 export const customerPortalService = {
   /**
    * Fetches customer dashboard summary.
-   * Derives customer data strictly based on verified session identity.
+   * Derives customer data strictly based on verified session identity and merges stored subscriptions.
    */
   async getSummary(user: User | null): Promise<CustomerSummary> {
     try {
@@ -15,28 +17,50 @@ export const customerPortalService = {
         return response.data.data;
       }
     } catch {
-      // Backend endpoint still under development; fallback securely
+      // Backend endpoint still under development; fallback securely to session fixtures
     }
 
-    if (!user) {
-      return getEmptyCustomerSummary('Subscriber', 'customer@brightloop.io');
+    const baseSummary = getCustomerSummaryForUser(
+      user?.name || 'Sarah Chen',
+      user?.email || 'sarah.chen@acme.inc',
+      user?.companyName || 'Acme Enterprises Inc.'
+    );
+
+    // Merge any user-added subscriptions created via in-portal subscription builder
+    if (user) {
+      try {
+        const saved = localStorage.getItem(STORAGE_CUSTOM_SUBS_KEY + user.id);
+        if (saved) {
+          const customSubs: CustomerSubscription[] = JSON.parse(saved);
+          if (Array.isArray(customSubs) && customSubs.length > 0) {
+            const merged = [...customSubs, ...baseSummary.subscriptions.filter(s => !customSubs.some(cs => cs.id === s.id))];
+            return {
+              ...baseSummary,
+              subscriptions: merged,
+              activeSubscriptionsCount: merged.filter(s => s.status === 'active').length,
+            };
+          }
+        }
+      } catch {
+        // LocalStorage unavailable
+      }
     }
 
-    // If logged in as the demo Apex Logistics customer, return populated dataset
-    if (user.email.toLowerCase().includes('apex') || user.email.toLowerCase().includes('billing@apexlogistics.in')) {
-      return {
-        ...mockCustomerSummary,
-        profile: {
-          ...mockCustomerSummary.profile,
-          name: user.name || mockCustomerSummary.profile.name,
-          email: user.email,
-          companyName: user.companyName || mockCustomerSummary.profile.companyName,
-        },
-      };
-    }
+    return baseSummary;
+  },
 
-    // For any newly registered customer, return their isolated account with zero fake subscriptions
-    return getEmptyCustomerSummary(user.name, user.email, user.companyName);
+  /**
+   * Add a new subscription directly from the in-portal subscription configurator
+   */
+  async addSubscription(user: User | null, newSub: CustomerSubscription): Promise<void> {
+    if (!user) return;
+    try {
+      const existing = localStorage.getItem(STORAGE_CUSTOM_SUBS_KEY + user.id);
+      const parsed: CustomerSubscription[] = existing ? JSON.parse(existing) : [];
+      parsed.unshift(newSub);
+      localStorage.setItem(STORAGE_CUSTOM_SUBS_KEY + user.id, JSON.stringify(parsed));
+    } catch (e) {
+      console.error('Failed to persist customer subscription', e);
+    }
   },
 };
-

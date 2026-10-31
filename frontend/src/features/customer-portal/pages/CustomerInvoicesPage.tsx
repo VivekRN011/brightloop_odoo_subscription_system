@@ -167,7 +167,12 @@ export const CustomerInvoicesPage: React.FC = () => {
                     >
                       <td className="py-4 px-4 font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                         <FileText size={15} className="text-slate-400" />
-                        <span className="font-mono">{inv.invoiceNumber}</span>
+                        <Link
+                          to={`/portal/invoices/${inv.id}`}
+                          className="font-mono hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline"
+                        >
+                          {inv.invoiceNumber}
+                        </Link>
                       </td>
                       <td className="py-4 px-4 text-slate-600 dark:text-slate-400">
                         {formatDate(inv.issueDate)}

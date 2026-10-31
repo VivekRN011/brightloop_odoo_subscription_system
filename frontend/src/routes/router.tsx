@@ -1,22 +1,51 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { PublicLayout } from '@/components/layout/PublicLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
-import { LoginPage, RegisterPage } from '@/features/auth';
+import { LoginPage, RegisterPage, ResetPasswordPage } from '@/features/auth';
+import { HomePage } from '@/features/public';
+import { ProductListPage, ProductDetailsPage } from '@/features/products';
 import {
   CustomerDashboardPage,
+  CustomerCatalogPage,
   CustomerSubscriptionsPage,
+  CustomerSubscriptionDetailPage,
   CustomerInvoicesPage,
+  CustomerInvoiceDetailPage,
+  CustomerPaymentsPage,
   CustomerProfilePage,
 } from '@/features/customer-portal';
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 import { NotFoundPage } from './NotFoundPage';
 import { PortalLayout } from '@/features/portal/PortalLayout';
-import { RootRedirect } from './RootRedirect';
+import { SubscribeRouteGuard } from './SubscribeRouteGuard';
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <RootRedirect />,
+    element: <PublicLayout />,
+    children: [
+      {
+        index: true,
+        element: <HomePage />,
+      },
+      {
+        path: 'products',
+        element: <ProductListPage />,
+      },
+      {
+        path: 'products/:id',
+        element: <ProductDetailsPage />,
+      },
+      {
+        path: 'subscribe',
+        element: <SubscribeRouteGuard />,
+      },
+      {
+        path: 'subscribe/:productId',
+        element: <SubscribeRouteGuard />,
+      },
+    ],
   },
   {
     path: '/login',
@@ -27,6 +56,10 @@ export const router = createBrowserRouter([
     element: <RegisterPage />,
   },
   {
+    path: '/reset-password/:token',
+    element: <ResetPasswordPage />,
+  },
+  {
     path: '/portal',
     element: <PortalLayout />,
     children: [
@@ -35,12 +68,28 @@ export const router = createBrowserRouter([
         element: <CustomerDashboardPage />,
       },
       {
+        path: 'catalog',
+        element: <CustomerCatalogPage />,
+      },
+      {
         path: 'subscriptions',
         element: <CustomerSubscriptionsPage />,
       },
       {
+        path: 'subscriptions/:id',
+        element: <CustomerSubscriptionDetailPage />,
+      },
+      {
         path: 'invoices',
         element: <CustomerInvoicesPage />,
+      },
+      {
+        path: 'invoices/:id',
+        element: <CustomerInvoiceDetailPage />,
+      },
+      {
+        path: 'payments',
+        element: <CustomerPaymentsPage />,
       },
       {
         path: 'profile',
@@ -212,7 +261,7 @@ export const router = createBrowserRouter([
             title="Discounts & Promotions"
             description="Manage promotional coupons, partner discount codes, and customer-specific concessions."
             category="Business Management"
-            adminOnly={true} // Only Admin can create/manage discount rules (PRD FR-DISC-01, BR-14, Table 4.4)
+            adminOnly={true}
             plannedFeatures={[
               'Admin-only rule configuration (PRD FR-DISC-01, Table 4.4)',
               'Fixed amount and percentage discount types (FR-DISC-02)',
@@ -263,7 +312,7 @@ export const router = createBrowserRouter([
             title="Staff Management"
             description="Admin-only team user management, role assignments, and access privileges."
             category="Configuration"
-            adminOnly={true} // Only Admin can create staff accounts (PRD Section 4.1, FR-AUTH-08, BR-03)
+            adminOnly={true}
             plannedFeatures={[
               'Only Admin can create staff accounts (PRD FR-AUTH-08, BR-03, Table 4.4)',
               'Staff accounts with granular operational permissions',
@@ -280,7 +329,7 @@ export const router = createBrowserRouter([
             title="Tax Settings"
             description="Configure Indian GST tax slabs, HSN/SAC codes, and inter-state tax rules."
             category="Configuration"
-            adminOnly={true} // Only Admin can configure tax rules (PRD Section 4.1, FR-TAX-01, Table 4.4)
+            adminOnly={true}
             plannedFeatures={[
               'Admin-only tax rule configuration (PRD FR-TAX-01, Table 4.4)',
               'Standard GST rates (5%, 12%, 18%, 28%) and zero-rated items',
