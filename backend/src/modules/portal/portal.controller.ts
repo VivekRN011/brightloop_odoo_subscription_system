@@ -266,7 +266,10 @@ export class PortalController {
           });
 
       if (!plan) {
-        plan = await prisma.subscriptionPlan.findFirst({ where: { isActive: true } });
+        plan = await prisma.subscriptionPlan.findFirst({
+          where: { isActive: true },
+          orderBy: [{ billingFrequency: "asc" }, { price: "asc" }],
+        });
       }
       if (!plan) return sendError(res, "Subscription plan not found", 404);
 
@@ -305,6 +308,15 @@ export class PortalController {
         }
       }
 
+      // Determine authoritative base unit price:
+      // When a subscriber purchases a specific product/service, product.salesPrice is the authoritative unit price.
+      // If product has no salesPrice, fall back to plan.price.
+      const productSalesPrice = Number(product.salesPrice || 0);
+      const planPrice = Number(plan.price || 0);
+      const baseUnitPrice = productSalesPrice > 0 ? productSalesPrice : planPrice;
+
+      const discountAmount = Number(req.body.discountAmount || 0);
+
       // Perform decimal-safe calculation with Indian GST rules
       const calcDoc = await BillingCalculationService.calculateDocument({
         lines: [
@@ -313,12 +325,13 @@ export class PortalController {
             planId: plan.id,
             description: `${product.name} - ${plan.name}`,
             quantity: Number(quantity),
-            unitPrice: Number(plan.price),
+            unitPrice: baseUnitPrice,
             variantPriceAdjustment: variantAdjustment,
             variantSnapshot,
           },
         ],
         customerState: customer.state,
+        documentDiscountAmount: discountAmount,
       });
       const calculated = calcDoc.lines[0];
 
@@ -363,7 +376,7 @@ export class PortalController {
           },
         });
 
-        // Create the initial invoice with accurate GST snapshots
+        // Create the initial invoice with accurate GST snapshots and correct totals
         const inv = await tx.invoice.create({
           data: {
             invoiceNumber,
@@ -372,9 +385,10 @@ export class PortalController {
             status: InvoiceStatus.CONFIRMED,
             issueDate: startAt,
             dueDate: new Date(startAt.getTime() + 15 * 86400000), // +15 days
-            subtotal: calculated.subtotal,
-            taxTotal: calculated.taxAmount,
-            grandTotal: calculated.lineTotal,
+            subtotal: calcDoc.subtotal,
+            discountTotal: calcDoc.discountTotal,
+            taxTotal: calcDoc.taxTotal,
+            grandTotal: calcDoc.grandTotal,
             currency: "INR",
             lines: {
               create: {

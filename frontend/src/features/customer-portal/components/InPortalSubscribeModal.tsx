@@ -66,9 +66,9 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
 
       if (plans.length > 0) {
         const matchedPlan = initialPlanCode
-          ? plans.find((pl) => pl.code === initialPlanCode || pl.id === initialPlanCode) || plans[0]
-          : plans[0];
-        setSelectedPlanId(matchedPlan.id);
+          ? plans.find((pl) => pl.code === initialPlanCode || pl.id === initialPlanCode)
+          : plans.find((pl) => pl.billingFrequency === 'MONTHLY') || plans[0];
+        setSelectedPlanId(matchedPlan ? matchedPlan.id : plans[0].id);
       }
 
       setStep(1);
@@ -120,6 +120,7 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
         planId: activePlan.id,
         variantId: activeVariant?.id || undefined,
         quantity,
+        discountAmount: discountAmount > 0 ? discountAmount : undefined,
       });
 
       const responseData = res.data?.data;
@@ -300,7 +301,7 @@ export const InPortalSubscribeModal: React.FC<InPortalSubscribeModalProps> = ({
                   >
                     {plans.map((pl) => (
                       <option key={pl.id} value={pl.id}>
-                        {pl.name} ({pl.billingFrequency}) — {formatINR(pl.price)}
+                        {pl.name} ({pl.billingFrequency.toLowerCase()})
                       </option>
                     ))}
                   </select>
