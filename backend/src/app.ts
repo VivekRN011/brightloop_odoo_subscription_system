@@ -19,6 +19,7 @@ import discountsRoutes from "./modules/discounts/discounts.routes";
 import taxesRoutes from "./modules/taxes/taxes.routes";
 import usersRoutes from "./modules/users/users.routes";
 import analyticsRoutes from "./modules/analytics/analytics.routes";
+import portalRoutes from "./modules/portal/portal.routes";
 
 const app = express();
 
@@ -65,6 +66,7 @@ app.use("/api/v1/discounts", discountsRoutes);
 app.use("/api/v1/taxes", taxesRoutes);
 app.use("/api/v1/users", usersRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
+app.use("/api/v1/portal", portalRoutes);
 
 // Central error handler
 app.use(errorHandler);

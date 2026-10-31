@@ -16,6 +16,7 @@ import { usePlans } from '@/features/plans/hooks/usePlans';
 import { useAuth } from '@/context/AuthContext';
 import { formatINR } from '@/lib/format';
 import { Button } from '@/components/ui/button';
+import { customerPortalService } from '@/features/customer-portal/services/customerPortal.service';
 
 export const SubscriptionWorkflowPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -109,15 +110,37 @@ export const SubscriptionWorkflowPage: React.FC = () => {
     }
   };
 
-  const handleSubmitQuotationRequest = () => {
+  const handleSubmitQuotationRequest = async () => {
     setIsSubmitting(true);
+    const generatedRef = "QUO-2026-" + Math.floor(1000 + Math.random() * 9000);
+
+    if (activeProduct && activePlan) {
+      try {
+        await customerPortalService.addSubscription(user, {
+          id: "sub-portal-" + Date.now(),
+          subscriptionNumber: "SUB-2026-" + Math.floor(1000 + Math.random() * 9000),
+          planName: activePlan.name,
+          productName: activeProduct.name,
+          status: 'active',
+          quantity,
+          billingInterval: activePlan.billingFrequency as any,
+          price: grandTotal,
+          currency: 'INR',
+          startDate: new Date().toISOString().slice(0, 10),
+          expiryDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+          nextBillingDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+        });
+      } catch (e) {
+        console.error('Subscription sync error:', e);
+      }
+    }
+
     setTimeout(() => {
       setIsSubmitting(false);
-      const generatedRef = `QUO-2026-${Math.floor(1000 + Math.random() * 9000)}`;
       setQuotationReference(generatedRef);
       setCurrentStep(5);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 1200);
+    }, 600);
   };
 
   if (productsLoading || plansLoading) {
