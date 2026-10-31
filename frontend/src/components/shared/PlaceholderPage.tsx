@@ -1,14 +1,16 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, Sparkles } from 'lucide-react';
+import { ArrowLeft, Clock, Sparkles, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '../layout/PageHeader';
+import { useAuth } from '@/context/AuthContext';
 
 export interface PlaceholderPageProps {
   title: string;
   description: string;
   category: string;
   plannedFeatures: string[];
+  adminOnly?: boolean;
 }
 
 export const PlaceholderPage: React.FC<PlaceholderPageProps> = ({
@@ -16,8 +18,52 @@ export const PlaceholderPage: React.FC<PlaceholderPageProps> = ({
   description,
   category,
   plannedFeatures,
+  adminOnly = false,
 }) => {
   const navigate = useNavigate();
+  const { role } = useAuth();
+
+  // If page is admin-only and user is STAFF, enforce restricted view
+  if (adminOnly && role !== 'ADMIN') {
+    return (
+      <div className="page-container space-y-6">
+        <PageHeader
+          title={title}
+          description="Access restricted by role permissions."
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/app/dashboard')}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft size={14} />
+              Back to Dashboard
+            </Button>
+          }
+        />
+
+        <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 p-8 shadow-sm text-center max-w-xl mx-auto my-12">
+          <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert size={24} />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
+            Administrator Privilege Required
+          </h2>
+          <p className="text-xs text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
+            Your account is currently signed in with the <strong>{role}</strong> role. Under Brightloop access control rules (PRD Section 4 & Table 4.4), only <strong>ADMIN</strong> users can configure staff accounts, tax rules, or discount policies.
+          </p>
+          <Button
+            size="sm"
+            onClick={() => navigate('/app/dashboard')}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          >
+            Return to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container space-y-6">

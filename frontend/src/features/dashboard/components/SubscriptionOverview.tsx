@@ -53,7 +53,7 @@ export const SubscriptionOverview: React.FC<SubscriptionOverviewProps> = ({ data
         </div>
 
         {/* Breakdown List */}
-        <div className="grid grid-cols-2 gap-3 mt-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-4">
           {data.map((item) => (
             <div
               key={item.status}

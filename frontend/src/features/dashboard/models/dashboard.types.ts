@@ -3,7 +3,13 @@
  * Strongly typed domain entities aligned with recurring billing & subscription lifecycle.
  */
 
-export type SubscriptionStatus = 'draft' | 'confirmed' | 'active' | 'closed';
+export type SubscriptionStatus =
+  | 'draft'
+  | 'quotation'
+  | 'confirmed'
+  | 'active'
+  | 'paused'
+  | 'closed';
 
 export type InvoiceStatus = 'draft' | 'confirmed' | 'paid' | 'cancelled';
 

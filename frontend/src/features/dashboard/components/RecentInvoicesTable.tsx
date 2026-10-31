@@ -12,12 +12,8 @@ export interface RecentInvoicesTableProps {
 
 export const RecentInvoicesTable: React.FC<RecentInvoicesTableProps> = ({ invoices }) => {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<'all' | 'paid' | 'confirmed' | 'draft'>('all');
-
-  const filteredInvoices = invoices.filter((inv) => {
-    if (filter === 'all') return true;
-    return inv.status === filter;
-  });
+  type InvoiceFilter = 'all' | 'confirmed' | 'paid' | 'overdue' | 'draft' | 'cancelled';
+  const [filter, setFilter] = useState<InvoiceFilter>('all');
 
   const isInvoiceOverdue = (dueDateStr: string, status: string) => {
     if (status === 'paid' || status === 'cancelled') return false;
@@ -26,6 +22,12 @@ export const RecentInvoicesTable: React.FC<RecentInvoicesTableProps> = ({ invoic
     const referenceDate = new Date('2026-10-31T12:00:00Z');
     return dueDate.getTime() < referenceDate.getTime();
   };
+
+  const filteredInvoices = invoices.filter((inv) => {
+    if (filter === 'all') return true;
+    if (filter === 'overdue') return isInvoiceOverdue(inv.dueDate, inv.status) && inv.outstandingAmount > 0;
+    return inv.status === filter;
+  });
 
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
@@ -48,12 +50,12 @@ export const RecentInvoicesTable: React.FC<RecentInvoicesTableProps> = ({ invoic
         {/* Filter Pills */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-            {(['all', 'paid', 'confirmed', 'draft'] as const).map((tab) => (
+            {(['all', 'confirmed', 'paid', 'overdue', 'draft', 'cancelled'] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => setFilter(tab)}
-                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all capitalize ${
+                className={`px-2 py-0.5 text-xs font-semibold rounded-md transition-all capitalize ${
                   filter === tab
                     ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'

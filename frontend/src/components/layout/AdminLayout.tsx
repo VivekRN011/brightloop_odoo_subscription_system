@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { useAuth } from '@/context/AuthContext';
 
 export const AdminLayout: React.FC = () => {
+  const { role } = useAuth();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('brightloop_sidebar_collapsed') === 'true';
@@ -13,6 +15,11 @@ export const AdminLayout: React.FC = () => {
   });
 
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Strictly enforce security separation: Customer role must never access admin routes (PRD G-07, G-08, FR-AUTH-09)
+  if (role === 'CUSTOMER') {
+    return <Navigate to="/portal" replace />;
+  }
 
   const toggleCollapse = () => {
     setCollapsed((prev) => {

@@ -5,8 +5,10 @@ import {
   Package,
   Layers,
   FileText,
+  CopyCheck,
   Repeat,
   Receipt,
+  AlertTriangle,
   CreditCard,
   Percent,
   BarChart3,
@@ -78,6 +80,11 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         icon: FileText,
       },
       {
+        label: 'Quotation Templates',
+        to: '/app/quotation-templates',
+        icon: CopyCheck,
+      },
+      {
         label: 'Subscriptions',
         to: '/app/subscriptions',
         icon: Repeat,
@@ -95,6 +102,12 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         icon: Receipt,
       },
       {
+        label: 'Overdue Invoices',
+        to: '/app/invoices/overdue',
+        icon: AlertTriangle,
+        badge: '4',
+      },
+      {
         label: 'Payments',
         to: '/app/payments',
         icon: CreditCard,
@@ -109,6 +122,7 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         label: 'Discounts',
         to: '/app/discounts',
         icon: Percent,
+        adminOnly: true, // Only Admin can create discount rules (PRD FR-DISC-01, BR-14)
       },
       {
         label: 'Reports & Analytics',
@@ -125,13 +139,13 @@ export const ADMIN_NAV_SECTIONS: NavSection[] = [
         label: 'Staff Management',
         to: '/app/settings/staff',
         icon: UserCheck,
-        adminOnly: true,
+        adminOnly: true, // Only Admin can create/manage staff (PRD FR-AUTH-08, BR-03)
       },
       {
         label: 'Tax Settings',
         to: '/app/settings/taxes',
         icon: PercentCircle,
-        adminOnly: true,
+        adminOnly: true, // Only Admin can configure tax rules (PRD FR-TAX-01)
       },
       {
         label: 'Settings',

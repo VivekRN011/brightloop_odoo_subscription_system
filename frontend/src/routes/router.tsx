@@ -4,6 +4,7 @@ import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 import { NotFoundPage } from './NotFoundPage';
+import { PortalLayout } from '@/features/portal/PortalLayout';
 
 export const router = createBrowserRouter([
   {
@@ -16,24 +17,73 @@ export const router = createBrowserRouter([
   },
   {
     path: '/portal',
-    element: (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6">
-        <div className="max-w-4xl mx-auto">
+    element: <PortalLayout />,
+    children: [
+      {
+        index: true,
+        element: (
           <PlaceholderPage
-            title="Customer Self-Service Portal"
-            description="Dedicated external portal for Brightloop subscribers to view their subscriptions, download invoices, and initiate payments."
+            title="Subscriber Dashboard"
+            description="Overview of your active subscriptions, current billing period, and pending payments."
             category="Customer Portal"
             plannedFeatures={[
-              'Separate customer session boundary',
-              'View active and past subscriptions',
-              'Download GST-compliant invoice PDFs',
-              'Integrated Razorpay Test Mode checkout',
-              'Update payment preferences and billing contact',
+              'Customer session boundary strictly isolated from admin data (PRD G-07, FR-AUTH-09)',
+              'Current active subscription details and upcoming renewal dates',
+              'Outstanding balance summary and quick pay action',
+              'Recent payment history and receipts',
             ]}
           />
-        </div>
-      </div>
-    ),
+        ),
+      },
+      {
+        path: 'subscriptions',
+        element: (
+          <PlaceholderPage
+            title="My Subscriptions"
+            description="View your subscribed products, plans, renewal terms, and service agreements."
+            category="Customer Portal"
+            plannedFeatures={[
+              'View only the signed-in customer’s subscriptions (PRD Section 4.3)',
+              'Inspect subscription lines, quantities, and plan billing cycles',
+              'Request plan change or pause if permitted by plan configuration',
+              'Renewal preferences and contract termination notice',
+            ]}
+          />
+        ),
+      },
+      {
+        path: 'invoices',
+        element: (
+          <PlaceholderPage
+            title="My Invoices"
+            description="View and download tax invoices for your subscription accounts."
+            category="Customer Portal"
+            plannedFeatures={[
+              'View only own customer invoices (PRD Section 4.3)',
+              'Download GST-compliant tax invoice PDFs',
+              'Inspect itemized line items, applied discounts, and taxes',
+              'View payment settlement status (Paid, Confirmed, Overdue)',
+            ]}
+          />
+        ),
+      },
+      {
+        path: 'profile',
+        element: (
+          <PlaceholderPage
+            title="Billing Profile & Tax Details"
+            description="Manage your company details, GSTIN, PAN, and billing address."
+            category="Customer Portal"
+            plannedFeatures={[
+              'Company legal name and primary contact details',
+              'Registered GSTIN and PAN verification',
+              'Billing address and state of supply configuration',
+              'Preferred payment notification contacts',
+            ]}
+          />
+        ),
+      },
+    ],
   },
   {
     path: '/app',
@@ -55,10 +105,10 @@ export const router = createBrowserRouter([
             description="Manage corporate subscriber accounts, billing addresses, and tax identifiers."
             category="Customer Management"
             plannedFeatures={[
-              'Customer listing with search and status filtering',
+              'Customer listing with search, sorting, and status filtering',
               'Company profiles with GSTIN, PAN, and contact details',
               'Billing and shipping address management',
-              'Customer-specific payment terms and discount rules',
+              'Customer-specific payment terms and discount overrides',
               'Complete subscription and invoice audit timeline',
             ]}
           />
@@ -68,14 +118,14 @@ export const router = createBrowserRouter([
         path: 'products',
         element: (
           <PlaceholderPage
-            title="Products & Offerings"
-            description="Configure subscription products, recurring service items, and catalog items."
+            title="Products & Variants"
+            description="Configure subscription products, cost prices, sales prices, and product variants."
             category="Catalog"
             plannedFeatures={[
-              'Product catalog management with active/inactive toggles',
-              'Product variant combinations (e.g. Seats, Storage, Tiers)',
-              'Recurring billing cycle configurations',
-              'HSN/SAC tax code classification',
+              'Product catalog management storing name, type, sales price, cost price, and notes (PRD FR-PROD-02)',
+              'Product variant attributes (e.g. Brand, Tier) with price adjustments (FR-PROD-03/05)',
+              'Product activation and deactivation toggles',
+              'Historical invoice pricing immutability (FR-PROD-07)',
             ]}
           />
         ),
@@ -85,13 +135,29 @@ export const router = createBrowserRouter([
         element: (
           <PlaceholderPage
             title="Subscription Plans"
-            description="Define recurring pricing tiers, billing cadences, and subscription terms."
+            description="Define recurring pricing tiers, billing cadences, and subscription lifecycle rules."
             category="Catalog"
             plannedFeatures={[
-              'Monthly, Quarterly, Biannual, and Annual billing intervals',
-              'Trial period and grace period configuration',
-              'Setup fee and upfront deposit parameters',
-              'Proration rules for mid-cycle plan changes',
+              'Strict support for 4 billing intervals: Daily, Weekly, Monthly, and Yearly (PRD FR-PLAN-03)',
+              'Minimum subscription quantity and plan availability start/end dates (FR-PLAN-04/05)',
+              'Automatic closure at end of plan configuration (FR-PLAN-06)',
+              'Early closure, pause, and renewal permission flags (FR-PLAN-07/08/09)',
+            ]}
+          />
+        ),
+      },
+      {
+        path: 'quotation-templates',
+        element: (
+          <PlaceholderPage
+            title="Quotation Templates"
+            description="Configure reusable commercial templates with pre-defined plans, products, and validity durations."
+            category="Subscriptions"
+            plannedFeatures={[
+              'Create reusable quotation templates (PRD FR-QUOTE-01)',
+              'Pre-populate product lines, subscription plans, and quantities (FR-QUOTE-02)',
+              'Configurable validity period in days (FR-QUOTE-03)',
+              'Template versioning and activation status',
             ]}
           />
         ),
@@ -101,13 +167,13 @@ export const router = createBrowserRouter([
         element: (
           <PlaceholderPage
             title="Quotations"
-            description="Prepare commercial subscription proposals and convert approved quotes into active subscriptions."
+            description="Prepare commercial subscription proposals from templates and convert accepted quotes into active subscriptions."
             category="Subscriptions"
             plannedFeatures={[
-              'Draft quotation generator with automated tax calculations',
-              'Customer discount code application',
-              'Quotation expiration and revision history',
-              'One-click conversion into confirmed subscription',
+              'Create quotations from reusable templates or scratch (PRD FR-QUOTE-04)',
+              'Associate quotation with customer and calculate validity expiry date',
+              'Automated tax and discount line calculations (FR-QUOTE-06)',
+              'One-click conversion into confirmed subscription upon acceptance (FR-QUOTE-07)',
             ]}
           />
         ),
@@ -117,13 +183,13 @@ export const router = createBrowserRouter([
         element: (
           <PlaceholderPage
             title="Subscriptions"
-            description="Manage the complete lifecycle of customer subscriptions from Draft to Closed."
+            description="Manage the complete lifecycle of customer recurring subscriptions."
             category="Subscriptions"
             plannedFeatures={[
-              'Lifecycle states: Draft, Confirmed, Active, Closed',
-              'Pause, resume, renew, and terminate workflows',
-              'Next billing date and renewal schedule tracking',
-              'Automated recurring invoice generation triggers',
+              'Complete 6 lifecycle states: Draft, Quotation, Confirmed, Active, Paused, Closed (PRD FR-SUB-07, Workflow WF-08)',
+              'Unique subscription identifier sequence (FR-SUB-01)',
+              'Plan-level permission enforcement for pause, early closure, and renewal (FR-SUB-09 to 12)',
+              'Next billing date tracking and automated recurring invoice triggers (FR-BILL-01)',
             ]}
           />
         ),
@@ -133,13 +199,29 @@ export const router = createBrowserRouter([
         element: (
           <PlaceholderPage
             title="Invoices"
-            description="Issue, track, and reconcile recurring billing invoices and overdue notices."
+            description="Issue, track, and reconcile recurring billing invoices and payment collections."
             category="Billing"
             plannedFeatures={[
-              'Invoice states: Draft, Confirmed, Paid, Cancelled',
-              'Automated overdue detection based on payment due dates',
-              'Itemized line items, GST breakdown, and discounts',
-              'One-click payment recording and receipt issuance',
+              'Invoice lifecycle states: Draft, Confirmed, Paid, Cancelled (PRD FR-BILL-10)',
+              'Duplicate billing prevention for identical subscription periods (FR-BILL-11)',
+              'Itemized line items snapshotting product, tax, and discount at billing time (FR-BILL-13)',
+              'Confirm, cancel, send, and print invoice actions (FR-BILL-06 to 09)',
+            ]}
+          />
+        ),
+      },
+      {
+        path: 'invoices/overdue',
+        element: (
+          <PlaceholderPage
+            title="Overdue Invoices"
+            description="Monitor and prioritize collections for confirmed invoices past their payment due date."
+            category="Billing"
+            plannedFeatures={[
+              'Identify confirmed invoices where outstanding balance > 0 and due date < current date (PRD FR-PAY-08, BR-18)',
+              'Overdue aging classification (1-15 days, 16-30 days, 30+ days overdue)',
+              'Direct payment recording action with outstanding amount pre-filled',
+              'Payment reminder follow-up log',
             ]}
           />
         ),
@@ -152,10 +234,10 @@ export const router = createBrowserRouter([
             description="Record manual collections and review automated online transactions."
             category="Billing"
             plannedFeatures={[
-              'Manual payment recording (NEFT, RTGS, UPI, Cheque, Cash)',
-              'Automatic invoice outstanding balance reconciliation',
-              'Razorpay Test Mode online payment capture and webhook sync',
-              'Payment receipt generation and verification logs',
+              'Record payments associated with specific invoices (PRD FR-PAY-01/02)',
+              'Support payment methods: Cash, Bank Transfer, UPI, Cheque, Card (Database enum PaymentMethod)',
+              'Persist amount, date, reference note, and allocation (FR-PAY-03 to 06)',
+              'Recalculate invoice paid amount and outstanding balance with partial settlement support (FR-PAY-09)',
             ]}
           />
         ),
@@ -167,11 +249,14 @@ export const router = createBrowserRouter([
             title="Discounts & Promotions"
             description="Manage promotional coupons, partner discount codes, and customer-specific concessions."
             category="Business Management"
+            adminOnly={true} // Only Admin can create/manage discount rules (PRD FR-DISC-01, BR-14, Table 4.4)
             plannedFeatures={[
-              'Percentage-based and flat INR discount codes',
-              'Validity date ranges and maximum redemption caps',
-              'Plan-specific or customer-tier eligibility rules',
-              'Redemption analytics and revenue impact tracking',
+              'Admin-only rule configuration (PRD FR-DISC-01, Table 4.4)',
+              'Fixed amount and percentage discount types (FR-DISC-02)',
+              'Minimum purchase amount or quantity thresholds (FR-DISC-03)',
+              'Start/end validity dates and maximum usage limits (FR-DISC-04/05)',
+              'Product-level vs subscription-level applicability (FR-DISC-06)',
+              'Automatic application to next recurring invoice run (FR-DISC-07)',
             ]}
           />
         ),
@@ -185,9 +270,9 @@ export const router = createBrowserRouter([
             category="Business Management"
             plannedFeatures={[
               'Monthly Recurring Revenue (MRR) and Annual Recurring Revenue (ARR)',
-              'Cohort retention and churn rate calculations',
-              'Accounts receivable aging report (Current, 30d, 60d, 90d+)',
-              'GST output tax liability summary for accounting export',
+              'Active subscriptions, revenue received, and outstanding trends (PRD FR-AN-01 to 04)',
+              'Customer retention and churn cohort breakdown',
+              'GST liability tax reports and CSV export capability',
             ]}
           />
         ),
@@ -201,9 +286,9 @@ export const router = createBrowserRouter([
             category="Configuration"
             plannedFeatures={[
               'Company legal name, GSTIN, PAN, and registered address',
-              'Default billing currency (INR) and payment terms (e.g. Net 15, Net 30)',
-              'Automated reminder email schedule for upcoming/overdue invoices',
-              'Webhook endpoints and integration API keys',
+              'Default billing currency (INR) and payment terms',
+              'Automated invoice reminder schedules',
+              'System audit logs and operational parameters',
             ]}
           />
         ),
@@ -215,11 +300,12 @@ export const router = createBrowserRouter([
             title="Staff Management"
             description="Admin-only team user management, role assignments, and access privileges."
             category="Configuration"
+            adminOnly={true} // Only Admin can create staff accounts (PRD Section 4.1, FR-AUTH-08, BR-03)
             plannedFeatures={[
-              'Staff member accounts with ADMIN and STAFF role assignments',
-              'Granular operational permissions for quotations and payments',
-              'Activity audit trail by team member',
-              'Account suspension and password reset tools',
+              'Only Admin can create staff accounts (PRD FR-AUTH-08, BR-03, Table 4.4)',
+              'Staff accounts with granular operational permissions',
+              'Activity audit trail by staff member',
+              'Account suspension and password reset triggers',
             ]}
           />
         ),
@@ -231,11 +317,12 @@ export const router = createBrowserRouter([
             title="Tax Settings"
             description="Configure Indian GST tax slabs, HSN/SAC codes, and inter-state tax rules."
             category="Configuration"
+            adminOnly={true} // Only Admin can configure tax rules (PRD Section 4.1, FR-TAX-01, Table 4.4)
             plannedFeatures={[
-              'Standard GST tax rates (5%, 12%, 18%, 28%) and nil-rated slabs',
-              'Automatic CGST + SGST vs IGST calculation based on state of supply',
+              'Admin-only tax rule configuration (PRD FR-TAX-01, Table 4.4)',
+              'Standard GST rates (5%, 12%, 18%, 28%) and zero-rated items',
+              'Automatic CGST + SGST vs IGST calculation based on place of supply',
               'HSN/SAC service classification code mapping',
-              'Tax invoice numbering sequence configuration',
             ]}
           />
         ),

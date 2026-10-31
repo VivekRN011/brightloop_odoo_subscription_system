@@ -15,7 +15,11 @@ export const LoginPage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     login(email, selectedRole);
-    navigate('/app/dashboard');
+    if (selectedRole === 'CUSTOMER') {
+      navigate('/portal');
+    } else {
+      navigate('/app/dashboard');
+    }
   };
 
   return (
@@ -43,14 +47,14 @@ export const LoginPage: React.FC = () => {
             </span>
             <span className="text-[10px] text-slate-400">Select role</span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => {
                 setSelectedRole('ADMIN');
                 setEmail('alex.morgan@brightloop.io');
               }}
-              className={`py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all ${
+              className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all ${
                 selectedRole === 'ADMIN'
                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
                   : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
@@ -64,13 +68,27 @@ export const LoginPage: React.FC = () => {
                 setSelectedRole('STAFF');
                 setEmail('staff.member@brightloop.io');
               }}
-              className={`py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all ${
+              className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all ${
                 selectedRole === 'STAFF'
                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
                   : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
               }`}
             >
               STAFF
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedRole('CUSTOMER');
+                setEmail('billing@apexlogistics.in');
+              }}
+              className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all ${
+                selectedRole === 'CUSTOMER'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              CUSTOMER
             </button>
           </div>
         </div>

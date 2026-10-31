@@ -101,10 +101,12 @@ export const mockDashboardData: DashboardData = {
     { month: 'Oct 2026', revenueReceived: 845200, invoicedAmount: 920000 },
   ],
   subscriptionOverview: [
-    { status: 'active', label: 'Active', count: 142, percentage: 71, color: '#16a34a' },
-    { status: 'confirmed', label: 'Confirmed', count: 28, percentage: 14, color: '#4f6ef7' },
-    { status: 'draft', label: 'Draft', count: 18, percentage: 9, color: '#0284c7' },
-    { status: 'closed', label: 'Closed', count: 12, percentage: 6, color: '#94a3b8' },
+    { status: 'active', label: 'Active', count: 142, percentage: 64, color: '#16a34a' },
+    { status: 'confirmed', label: 'Confirmed', count: 28, percentage: 13, color: '#4f6ef7' },
+    { status: 'quotation', label: 'Quotation', count: 15, percentage: 7, color: '#0284c7' },
+    { status: 'draft', label: 'Draft', count: 18, percentage: 8, color: '#64748b' },
+    { status: 'paused', label: 'Paused', count: 6, percentage: 3, color: '#d97706' },
+    { status: 'closed', label: 'Closed', count: 12, percentage: 5, color: '#94a3b8' },
   ],
   recentInvoices: [
     {
